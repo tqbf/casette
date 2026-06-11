@@ -1,26 +1,31 @@
 import SwiftUI
 
 /// Details for the selected tape row: the envelope fields the UI carries
-/// (kind, input, generated Sage, plain, LaTeX, approx, timing).
+/// (kind, plain, approx, LaTeX, error), the input split (raw vs generated
+/// Sage), and the evaluation metadata (duration, time).
 struct InspectorTabView: View {
-    let row: TapeRow?
+    let row: SessionRow?
 
     var body: some View {
         if let row {
             Form {
                 Section("Result") {
-                    LabeledContent("Kind", value: row.kind)
-                    if !row.primary.isEmpty {
-                        InspectorMonoField(label: "Plain", value: row.primary)
-                    }
-                    if let approx = row.approx {
-                        InspectorMonoField(label: "Approx", value: "≈ \(approx)")
-                    }
-                    if let latex = row.latex {
-                        InspectorMonoField(label: "LaTeX", value: latex)
-                    }
-                    if let errorType = row.errorType {
-                        LabeledContent("Error", value: errorType)
+                    if let result = row.result {
+                        LabeledContent("Kind", value: result.kind)
+                        if !result.plain.isEmpty {
+                            InspectorMonoField(label: "Plain", value: result.plain)
+                        }
+                        if let approx = result.approx {
+                            InspectorMonoField(label: "Approx", value: "≈ \(approx)")
+                        }
+                        if let latex = result.latex {
+                            InspectorMonoField(label: "LaTeX", value: latex)
+                        }
+                        if let error = result.error {
+                            LabeledContent("Error", value: error.type)
+                        }
+                    } else {
+                        LabeledContent("Status", value: "Not evaluated")
                     }
                 }
                 Section("Input") {

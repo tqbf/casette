@@ -28,7 +28,7 @@ struct SidebarView: View {
 
             switch selectedTab {
             case .symbols:
-                SymbolsTabView(symbols: model.symbols)
+                SymbolsTabView(symbols: model.symbols.entries)
             case .history:
                 HistoryTabView(model: model, focusInput: focusInput)
             case .inspector:

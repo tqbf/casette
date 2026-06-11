@@ -23,7 +23,7 @@ struct HistoryTabView: View {
         }
     }
 
-    private func insert(_ row: TapeRow) {
+    private func insert(_ row: SessionRow) {
         model.insertIntoDraft(row.input)
         focusInput()
     }

@@ -34,7 +34,7 @@ struct SymbolRowView: View {
 }
 
 #Preview {
-    List(PlaceholderData.symbols) { symbol in
+    List(PlaceholderData.symbols.entries) { symbol in
         SymbolRowView(symbol: symbol)
     }
     .frame(width: 280, height: 300)

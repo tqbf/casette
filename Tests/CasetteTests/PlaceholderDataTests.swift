@@ -9,10 +9,10 @@ struct PlaceholderDataTests {
         let rows = PlaceholderData.rows
         #expect(!rows.isEmpty)
         // A value row with an ≈ secondary line (the V0.8 display policy).
-        #expect(rows.contains { $0.status == .ok && $0.approx != nil })
+        #expect(rows.contains { $0.status == .ok && $0.result?.approx != nil })
         // A statement row (assignment — echoes no value).
         #expect(rows.contains { $0.isStatement })
-        // A plot row and an error row.
+        // A plot row and an error row (with structured error detail).
         #expect(rows.contains { $0.isPlot })
         #expect(rows.contains { $0.status == .error && $0.errorType != nil })
     }
@@ -26,14 +26,33 @@ struct PlaceholderDataTests {
     @Test("value rows carry per-kind actions for the Actions tab")
     func valueRowsCarryActions() {
         for row in PlaceholderData.rows where row.status == .ok && !row.isStatement {
-            #expect(!row.actions.isEmpty, "row \(row.input) has no actions")
+            #expect(row.result?.actions.isEmpty == false, "row \(row.input) has no actions")
         }
     }
 
-    @Test("symbols are sorted by name, like the worker symbols op")
+    @Test("the plot row's artifacts are honest path refs marked missing")
+    func plotArtifactsAreMissingPathRefs() {
+        let plot = PlaceholderData.rows.first { $0.isPlot }
+        let artifacts = plot?.result?.artifacts ?? []
+        #expect(!artifacts.isEmpty)
+        // Placeholder /tmp paths don't exist — the EXPECTED restored state
+        // (PROBLEMS.md V0.10): the row still renders from its plain text.
+        #expect(artifacts.allSatisfy { $0.status == .missing })
+        #expect(plot?.result?.plain.isEmpty == false)
+    }
+
+    @Test("completed rows are stamped like the V0.10 recorder (cached at eval time)")
+    func provenanceIsCached() {
+        for row in PlaceholderData.rows {
+            #expect(row.provenance.kind == .cached)
+            #expect(row.provenance.cachedAt == row.timestamp)
+        }
+    }
+
+    @Test("symbol entries are sorted by name, like the worker symbols op")
     func symbolsSorted() {
-        let names = PlaceholderData.symbols.map(\.name)
+        let names = PlaceholderData.symbols.entries.map(\.name)
         #expect(names == names.sorted())
-        #expect(!PlaceholderData.symbols.isEmpty)
+        #expect(!PlaceholderData.symbols.entries.isEmpty)
     }
 }

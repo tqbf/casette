@@ -5,8 +5,9 @@ import SwiftUI
 /// nothing for a statement). Selection drives the Inspector and Actions
 /// tabs; background priority is selected > hovered > clear (§7.2).
 struct TapeRowView: View {
-    let row: TapeRow
+    let row: SessionRow
     let isSelected: Bool
+    let isKernelConnected: Bool
     let onSelect: () -> Void
 
     @State private var isHovered = false
@@ -25,7 +26,7 @@ struct TapeRowView: View {
                     .font(Theme.Fonts.meta)
                     .foregroundStyle(.tertiary)
             }
-            TapeRowResultView(row: row)
+            TapeRowResultView(row: row, isKernelConnected: isKernelConnected)
         }
         .padding(.horizontal, Theme.rowPaddingHorizontal)
         .padding(.vertical, Theme.rowPaddingVertical)
@@ -43,10 +44,10 @@ struct TapeRowView: View {
         .contextMenu {
             Button("Copy Input") { Pasteboard.copy(row.input) }
             Button("Copy Generated Sage") { Pasteboard.copy(row.sage) }
-            if !row.primary.isEmpty {
-                Button("Copy Result") { Pasteboard.copy(row.primary) }
+            if let plain = row.result?.plain, !plain.isEmpty {
+                Button("Copy Result") { Pasteboard.copy(plain) }
             }
-            if let latex = row.latex {
+            if let latex = row.result?.latex {
                 Button("Copy LaTeX") { Pasteboard.copy(latex) }
             }
         }
@@ -56,7 +57,7 @@ struct TapeRowView: View {
 #Preview {
     VStack(spacing: 2) {
         ForEach(PlaceholderData.rows.prefix(4)) { row in
-            TapeRowView(row: row, isSelected: false, onSelect: {})
+            TapeRowView(row: row, isSelected: false, isKernelConnected: false, onSelect: {})
         }
     }
     .padding()

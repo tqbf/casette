@@ -56,6 +56,26 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.2 done (live gate PASSED on screen) — the real session
+model is behind the UI.** The V0.10 Codable types (`Session` / `SessionRow` /
+`PersistedEnvelope` / `PersistedArtifact` / `Provenance` / `RowStatus`) are
+**lifted verbatim** into `Sources/Casette/Model/` — the persisted types ARE
+the live model (zero deviation from SESSION-FORMAT.md, pinned by a
+vocabulary test), so V1.9's `SessionStore` is a drop-in. The V1.2 spec names
+`ResultEnvelope`/`Artifact` are typealiases onto them. New app-side types:
+`CompiledInput` (input-vs-sage split; bypass-only until V1.4), `Evaluation`
+(kernel outcome; `ShellModel.append`/`complete` is the V1.3 seam),
+`KernelState` (the V0.2 eight states + `.notConnected`), `SymbolSnapshot`
+(replace-whole V0.6 semantics). "Not evaluated" is **presentation**, not a
+new status: a submitted row is `.running` (= incomplete) with no result, and
+the tape derives the honest message from `KernelState`. UI state stays out of
+result data (`PersistedEnvelope` has zero UI fields; selection is transient
+on `ShellModel`; `expanded` stays on the row because schema v1 persists it).
+`make check` / `make test` (**34/34**) / `make build` green; full V0
+regression re-run clean; swiftui-pro + macos-design findings applied (see
+PROGRESS.md). **Next: V1.3 — kernel integration** (unify v0/09+v0/10
+`WorkerProcess`/`LineReader` into one `SageKernel`).
+
 **V1.1 done — the app shell exists and feels like the product.** The
 three-region layout is real: a scrolling **session tape** (rests at the
 bottom, follows appends), a **tabbed right sidebar** (Symbols / History /

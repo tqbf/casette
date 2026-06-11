@@ -1,17 +1,17 @@
 import SwiftUI
 
 /// Context-sensitive actions for the selected result, straight from the
-/// envelope's per-kind `actions` list. Informational in V1.1 — they become
-/// runnable follow-up evaluations in V1.11 (so they are rendered as labels,
-/// not stubbed buttons that do nothing).
+/// envelope's per-kind `actions` list. Informational until V1.11 makes them
+/// runnable follow-up evaluations (so they are rendered as labels, not
+/// stubbed buttons that do nothing).
 struct ActionsTabView: View {
-    let row: TapeRow?
+    let row: SessionRow?
 
     var body: some View {
-        if let row, !row.actions.isEmpty {
+        if let actions = row?.result?.actions, !actions.isEmpty {
             List {
                 Section {
-                    ForEach(row.actions, id: \.self) { action in
+                    ForEach(actions, id: \.self) { action in
                         Label(action, systemImage: "bolt")
                             .font(Theme.Fonts.sidebarMono)
                             .listRowSeparator(.hidden)
@@ -28,12 +28,18 @@ struct ActionsTabView: View {
             ContentUnavailableView(
                 "No Actions",
                 systemImage: "bolt",
-                description: Text(
-                    row == nil
-                        ? "Select a result in the tape to see its actions."
-                        : "This result has no actions."
-                )
+                description: Text(emptyDescription)
             )
+        }
+    }
+
+    /// Honest empty-state copy: no selection, a row that was never evaluated
+    /// (no result yet), or a result whose kind genuinely has no actions.
+    private var emptyDescription: String {
+        switch row {
+        case nil: "Select a result in the tape to see its actions."
+        case .some(let row) where row.result == nil: "This row hasn't been evaluated yet."
+        default: "This result has no actions."
         }
     }
 }

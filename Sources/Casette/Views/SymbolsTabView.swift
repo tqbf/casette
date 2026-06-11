@@ -24,6 +24,6 @@ struct SymbolsTabView: View {
 }
 
 #Preview {
-    SymbolsTabView(symbols: PlaceholderData.symbols)
+    SymbolsTabView(symbols: PlaceholderData.symbols.entries)
         .frame(width: 280, height: 400)
 }

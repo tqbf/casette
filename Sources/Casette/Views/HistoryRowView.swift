@@ -3,7 +3,7 @@ import SwiftUI
 /// One history entry: the raw input plus its time, double-click or
 /// context-menu to reuse it.
 struct HistoryRowView: View {
-    let row: TapeRow
+    let row: SessionRow
     let onInsert: () -> Void
 
     var body: some View {

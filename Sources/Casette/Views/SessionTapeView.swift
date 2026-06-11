@@ -22,6 +22,7 @@ struct SessionTapeView: View {
                             TapeRowView(
                                 row: row,
                                 isSelected: model.selectedRowID == row.id,
+                                isKernelConnected: model.kernelState.isConnected,
                                 onSelect: { model.select(row.id) }
                             )
                             .id(row.id)
