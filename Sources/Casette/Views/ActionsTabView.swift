@@ -17,7 +17,7 @@ struct ActionsTabView: View {
                             .listRowSeparator(.hidden)
                     }
                 } footer: {
-                    Text("Preview — actions will run once Sage is connected.")
+                    Text("Preview — running these from the sidebar isn't wired up yet.")
                         .font(Theme.Fonts.meta)
                         .foregroundStyle(.secondary)
                 }

@@ -9,17 +9,25 @@ import SwiftUI
 /// the `@FocusState` so sidebar actions (and later ⌘L, V1.12) can hand focus
 /// back to the input.
 struct RootView: View {
-    @State private var model = ShellModel(
-        rows: PlaceholderData.rows,
-        symbols: PlaceholderData.symbols
-    )
+    @State private var model = ShellModel()
     @State private var isSidebarPresented = true
     @FocusState private var isInputFocused: Bool
+
+    /// Previews pass false so opening a canvas never spawns a Sage process.
+    var connectsKernel = true
 
     var body: some View {
         VStack(spacing: 0) {
             SessionTapeView(model: model)
             Divider()
+            // The kernel recovery banner: shown only when the kernel is
+            // unavailable for a reason the user should see. Plain structural
+            // conditional — no transition (SWIFTUI-RULES §1.1 is about
+            // animated insert/remove).
+            if let issue = model.kernelIssue {
+                KernelIssueBanner(message: issue) { model.restartKernel() }
+                Divider()
+            }
             InputPaneView(model: model, isFocused: $isInputFocused)
         }
         .frame(minWidth: Theme.windowMinWidth, minHeight: Theme.windowMinHeight)
@@ -42,8 +50,14 @@ struct RootView: View {
             }
         }
         .focusedSceneValue(\.isSidebarPresented, $isSidebarPresented)
+        .focusedSceneValue(\.shellModel, model)
         .defaultFocus($isInputFocused, true)
-        .task { isInputFocused = true }
+        .task {
+            isInputFocused = true
+            if connectsKernel {
+                model.connectKernel()
+            }
+        }
     }
 
     private func toggleSidebar() {
@@ -56,6 +70,6 @@ struct RootView: View {
 }
 
 #Preview {
-    RootView()
+    RootView(connectsKernel: false)
         .frame(width: 1040, height: 720)
 }

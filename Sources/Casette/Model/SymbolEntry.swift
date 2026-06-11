@@ -1,8 +1,8 @@
 import Foundation
 
-/// Placeholder symbol-table entry. Mirrors the worker `symbols` op response
-/// (`{name, kind, summary}`, WORKER-PROTOCOL.md V0.6) so V1.6 can feed the
-/// live op straight into the same view.
+/// One symbol-table entry, mirroring the worker `symbols` op response
+/// (`{name, kind, summary}`, WORKER-PROTOCOL.md V0.6). Live as of V1.3: the
+/// sidebar refreshes from the real op after every evaluation.
 struct SymbolEntry: Identifiable, Equatable, Sendable {
     var name: String
     var kind: String

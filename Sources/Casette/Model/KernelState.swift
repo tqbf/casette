@@ -21,9 +21,12 @@ enum KernelState: String, Equatable, Sendable {
     case error
     /// Last evaluation was interrupted (SIGINT); worker survived.
     case interrupted
-    /// Last evaluation timed out and was escalated; see V0.2 policy.
+    /// Last evaluation timed out and the SIGINT resolved it — the worker
+    /// survived and is ready for more. (When the escalation has to hard-kill
+    /// instead, the worker is gone and the state is `.crashed`.)
     case timedOut = "timed_out"
-    /// The worker process died. Only `restart` recovers from this.
+    /// The worker process died — crashed on its own, or force-stopped by the
+    /// escalation policy. Only `restart` recovers from this.
     case crashed
     case restarting
 

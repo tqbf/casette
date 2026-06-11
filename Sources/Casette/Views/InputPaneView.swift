@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The bottom input pane — a single prominent calculator line. Return
-/// submits; the real input behaviors (multiline, history, generated-Sage
+/// The bottom input pane — a single prominent calculator line with the
+/// kernel status indicator at its trailing edge. Return submits and
+/// evaluates; the real input behaviors (multiline, history, generated-Sage
 /// disclosure, compiler integration) arrive in V1.4.
 struct InputPaneView: View {
     @Bindable var model: ShellModel
@@ -30,6 +31,7 @@ struct InputPaneView: View {
                 .opacity(model.draft.isEmpty ? 0 : 1)
                 .animation(.easeOut(duration: 0.15), value: model.draft.isEmpty)
                 .accessibilityHidden(true)
+            KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
         }
         .padding(.horizontal, Theme.inputPaddingHorizontal)
         .padding(.vertical, Theme.inputPaddingVertical)

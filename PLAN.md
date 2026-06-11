@@ -56,6 +56,27 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.3 done (live gate PASSED on screen, all 12 checks) — the app talks to
+Sage.** `SageKernel` (Sources/Casette/Kernel/) unifies v0/09's
+`WorkerProcess`+`LineReader`: `posix_spawn` + `SETSID` **+
+`SETSIGDEF`/`SETSIGMASK`** (new PROBLEMS.md lesson — a posix_spawn child
+inherits the parent's ignored signals, which silently kills the interrupt
+story), banner-pid SIGINT, group hard-kill, stderr → a worker log,
+quit-time `KernelReaper` (no orphans on ⌘Q, proven live). `SessionController`
+is an actor port of v0/02's controller.py: eight states through
+`KernelState`, ID routing over a single-consumer `WireQueue`, timeout with
+SIGINT→hard-kill escalation, generation-guarded restart, event-driven crash
+detection, status over one `AsyncStream`. Discovery = the lifted V0.9 search
++ `sage-doctor.json`; worker.py is bundled byte-identically by build.sh
+(`cmp`-verified). The UI evaluates for real: pending row → spinner →
+envelope via the frozen `EnvelopeMapping`; live `symbols` refresh after
+every eval; status indicator + crash banner + Sage menu (⌘. interrupt,
+⌘⇧R restart). `make check` / `make test` (**64/64**, incl. 3 real-Sage
+integration journeys) / `make build` green; full V0 regression re-run clean;
+launched + quit clean, `pgrep` clean. **Friendly compiler still unwired
+(V1.4) — type raw Sage.** Details + the on-screen verifier checklist in
+PROGRESS.md. **Next: V1.4 — input pane v1.**
+
 **V1.2 done (live gate PASSED on screen) — the real session
 model is behind the UI.** The V0.10 Codable types (`Session` / `SessionRow` /
 `PersistedEnvelope` / `PersistedArtifact` / `Provenance` / `RowStatus`) are
