@@ -59,6 +59,16 @@ final class ShellModel {
     /// An ambiguous submission awaiting the user's pick (drives the inline
     /// candidate panel above the input). Transient UI state, never persisted.
     var pendingAmbiguity: PendingAmbiguity?
+    /// V1.8 numeric mode: while on, TYPED submissions evaluate force-numeric
+    /// (the V0.8 per-request `numeric:true` — decimal primary, exact form
+    /// preserved in `exactValue`; the worker guarantees the namespace stays
+    /// exact). A sticky, always-visible toggle (the pressed input-pane
+    /// button + the checked Sage-menu item make the scope obvious), scoped
+    /// to draft submissions only — sidebar flows (inspect/forget/actions)
+    /// are never numeric, and rerun reproduces the ORIGINAL row's recorded
+    /// flag. Transient session-display state, never persisted (each row
+    /// records its own `numeric`).
+    var numericMode = false
     /// Command history (the session's submitted inputs) behind Up/Down.
     private(set) var inputHistory = InputHistory()
 
@@ -109,6 +119,44 @@ final class ShellModel {
     /// worker.py stays byte-frozen (the prelude is app-side).
     static let bootPrelude = "var('x, y, z, t')"
 
+    /// The worker's own default `precision_digits` (WORKER-PROTOCOL.md
+    /// `config` op). A fresh worker boots at this value, so the boot/restart
+    /// path only sends a `config` op when the session differs from it.
+    static let workerDefaultPrecisionDigits = 10
+
+    /// The session-level approximation precision (decimal digits for the
+    /// envelope's `approx` and numeric-mode primaries). Reads/writes the
+    /// session header's `precisionDigits` (SESSION-FORMAT.md — V1.9 persists
+    /// and restores it); the setter pushes the worker `config` op through the
+    /// serial kernel queue, so it lands between evals in submission order.
+    var precisionDigits: Int {
+        get { session.precisionDigits }
+        set { setPrecision(newValue) }
+    }
+
+    /// Applies a new session precision: updates the session header and sends
+    /// the worker `config` op (queued, so in-flight evals keep their old
+    /// precision and later ones get the new — strictly in tape order).
+    /// Non-positive and no-op values are ignored (the worker would reject
+    /// them anyway; the UI offers only valid choices).
+    func setPrecision(_ digits: Int) {
+        guard digits > 0, digits != session.precisionDigits else { return }
+        session.precisionDigits = digits
+        session.updated = .now
+        guard let controller else { return }
+        enqueueKernelWork {
+            _ = await controller.configure(precisionDigits: digits)
+        }
+    }
+
+    /// The session precision IF it differs from a fresh worker's default —
+    /// what boot/restart must re-apply (the worker holds precision as session
+    /// state, so a restart silently resets it to 10 otherwise).
+    private var precisionNeedingReapply: Int? {
+        session.precisionDigits == Self.workerDefaultPrecisionDigits
+            ? nil : session.precisionDigits
+    }
+
     /// Attaches the kernel controller, starts watching its status stream,
     /// and boots Sage (followed by the `var('x, y, z, t')` boot prelude and
     /// a symbol refresh). With no controller attached (previews, pure model
@@ -126,22 +174,41 @@ final class ShellModel {
         enqueueKernelWork { [weak self] in
             await controller.connect()
             _ = await controller.evaluate(Self.bootPrelude)
+            if let digits = self?.precisionNeedingReapply {
+                _ = await controller.configure(precisionDigits: digits)
+            }
             await self?.refreshSymbols()
         }
     }
 
     /// Intentionally resets the session's Sage state: kills the worker,
     /// boots a fresh one, re-applies the boot prelude (the fresh namespace
-    /// gets the same calculator variables), and refreshes the symbol table
-    /// (back to `x, y, z, t`). NOT chained behind pending evaluations — restart is the
-    /// escape hatch and must preempt a stuck eval (which then finishes as
-    /// interrupted).
+    /// gets the same calculator variables) AND the configured session
+    /// precision (the fresh worker resets to 10 — V0.8 session state), and
+    /// refreshes the symbol table (back to `x, y, z, t`).
+    ///
+    /// Two-part ordering (the V1.8 fix for a latent race):
+    ///   * The `restart()` call itself is NOT chained behind pending
+    ///     evaluations — restart is the escape hatch and must preempt a
+    ///     stuck eval (which then finishes as interrupted; chaining it would
+    ///     deadlock behind the very eval it's meant to kill).
+    ///   * The RE-INIT (prelude, precision, symbols) IS enqueued on the
+    ///     serial kernel queue, awaiting the restart first — so a submission
+    ///     typed right after ⌘⇧R deterministically evaluates AFTER the fresh
+    ///     worker has its calculator variables and session precision. (The
+    ///     old shape ran the whole pipeline un-chained; a fast next
+    ///     submission could land on the fresh namespace before the prelude
+    ///     and NameError where the REPL succeeds.)
     func restartKernel() {
         guard let controller else { return }
-        Task {
-            await controller.restart()
+        let restart = Task { await controller.restart() }
+        enqueueKernelWork { [weak self] in
+            await restart.value
             _ = await controller.evaluate(Self.bootPrelude)
-            await refreshSymbols()
+            if let digits = self?.precisionNeedingReapply {
+                _ = await controller.configure(precisionDigits: digits)
+            }
+            await self?.refreshSymbols()
         }
     }
 
@@ -189,7 +256,7 @@ final class ShellModel {
         guard !input.isEmpty else { return }
         switch CompiledInput.compile(input) {
         case let .ready(compiled):
-            submitCompiled(compiled, advancing: advancing)
+            submitCompiled(compiled, advancing: advancing, numeric: numericMode)
         case .error:
             break  // shown inline by `draftPreview`; no row, draft kept
         case let .ambiguous(candidates):
@@ -207,7 +274,8 @@ final class ShellModel {
         pendingAmbiguity = nil
         submitCompiled(
             CompiledInput.chosenCandidate(raw: pending.raw, sage: candidate),
-            advancing: pending.advances)
+            advancing: pending.advances,
+            numeric: numericMode)
     }
 
     /// Keyboard pick while the ambiguity picker is up: Return = index 0,
@@ -234,13 +302,15 @@ final class ShellModel {
     }
 
     @discardableResult
-    private func submitCompiled(_ compiled: CompiledInput, advancing: Bool) -> SessionRow.ID {
-        let rowID = append(compiled)
+    private func submitCompiled(
+        _ compiled: CompiledInput, advancing: Bool, numeric: Bool = false
+    ) -> SessionRow.ID {
+        let rowID = append(compiled, numeric: numeric)
         inputHistory.record(compiled.raw)
         if advancing {
             draft = ""
         }
-        evaluate(rowID: rowID, compiled: compiled)
+        evaluate(rowID: rowID, compiled: compiled, numeric: numeric)
         return rowID
     }
 
@@ -296,14 +366,18 @@ final class ShellModel {
     /// normal submit path — a fresh row at the end of the tape, the original
     /// untouched, the draft untouched. An input that compiles ambiguous
     /// re-submits its RECORDED resolution (`row.sage`); rerun never re-asks.
+    /// A row evaluated in numeric mode reruns numeric (the recorded flag,
+    /// not the toggle's current state — rerun reproduces the original).
     func rerun(rowID: SessionRow.ID) {
         guard let row = session.rows.first(where: { $0.id == rowID }) else { return }
+        let numeric = row.numeric == true
         switch CompiledInput.compile(row.input) {
         case let .ready(compiled):
-            submitCompiled(compiled, advancing: false)
+            submitCompiled(compiled, advancing: false, numeric: numeric)
         case .ambiguous:
             submitCompiled(
-                .chosenCandidate(raw: row.input, sage: row.sage), advancing: false)
+                .chosenCandidate(raw: row.input, sage: row.sage),
+                advancing: false, numeric: numeric)
         case .error:
             break  // a previously submitted input can't stop compiling
         }
@@ -317,6 +391,18 @@ final class ShellModel {
     func evaluateActionCommand(_ command: String) {
         guard let rowID = submitProgrammatically(command) else { return }
         select(rowID)
+    }
+
+    /// Card context menu → Approximate Numerically: evaluates the row's
+    /// `approx` action command (`(<expr>).n()` — the same stateless command
+    /// the Actions tab builds) as a fresh, visible tape row and selects it.
+    /// The V1.8 "approximation is one click away" affordance for exact
+    /// results, right on the card.
+    func approximateNumerically(rowID: SessionRow.ID) {
+        guard let row = session.rows.first(where: { $0.id == rowID }),
+              let command = row.approximateCommand
+        else { return }
+        evaluateActionCommand(command)
     }
 
     // MARK: - History navigation (Up/Down)
@@ -361,13 +447,15 @@ final class ShellModel {
     /// part of what's sent, never part of what the row displays. Prelude
     /// results are discarded (`var` over a valid identifier can't fail and
     /// re-declaring is idempotent).
-    private func evaluate(rowID: SessionRow.ID, compiled: CompiledInput) {
+    private func evaluate(rowID: SessionRow.ID, compiled: CompiledInput, numeric: Bool = false) {
         guard let controller else { return }  // pre-kernel: row stays pending
         enqueueKernelWork { [weak self] in
             for prelude in compiled.preludes {
                 _ = await controller.evaluate(prelude)
             }
-            let evaluation = await controller.evaluate(compiled.sage)
+            // `numeric` rides only on the row's own eval, never the preludes
+            // (a `var('V')` echoes nothing to re-present anyway).
+            let evaluation = await controller.evaluate(compiled.sage, numeric: numeric)
             guard let self else { return }
             complete(rowID: rowID, with: evaluation)
             await refreshSymbols()
@@ -392,15 +480,18 @@ final class ShellModel {
 
     /// Appends a pending (incomplete) row for a compiled input and returns its
     /// stable identity. V1.3 calls this on submit, then `complete(rowID:with:)`
-    /// when the kernel answers.
+    /// when the kernel answers. A numeric-mode submission records the flag on
+    /// the row (`SessionRow.numeric`, the V1.8 additive field — nil, not
+    /// false, for a normal eval so the persisted shape stays unchanged).
     @discardableResult
-    func append(_ compiled: CompiledInput, at date: Date = .now) -> SessionRow.ID {
+    func append(_ compiled: CompiledInput, numeric: Bool = false, at date: Date = .now) -> SessionRow.ID {
         let row = SessionRow(
             input: compiled.raw,
             sage: compiled.sage,
             result: nil,
             status: .running,
-            timestamp: date
+            timestamp: date,
+            numeric: numeric ? true : nil
         )
         session.rows.append(row)
         session.updated = date

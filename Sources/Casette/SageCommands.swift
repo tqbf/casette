@@ -22,6 +22,21 @@ struct SageCommands: Commands {
 
             Divider()
 
+            // V1.8 numeric mode — the menu mirror of the input pane's
+            // "≈ Numeric" toggle (same model flag; the checkmark and the
+            // pressed button always agree). No shortcut yet: V1.12 is the
+            // keyboard pass, and a key must never be advertised unverified
+            // (PROBLEMS.md).
+            if let model {
+                @Bindable var model = model
+                Toggle("Numeric Results", isOn: $model.numericMode)
+            } else {
+                Toggle("Numeric Results", isOn: .constant(false))
+                    .disabled(true)
+            }
+
+            Divider()
+
             Button("Interrupt Evaluation") {
                 model?.interruptEvaluation()
             }

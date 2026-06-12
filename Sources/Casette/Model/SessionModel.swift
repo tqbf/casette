@@ -102,6 +102,15 @@ public struct SessionRow: Codable, Equatable, Sendable {
   public var supersededCache: SupersededCache?
   /// UI state: was the row expanded? (V1.2 "expanded/collapsed UI state".)
   public var expanded: Bool
+  /// True when this row was evaluated in force-numeric mode (the V0.8
+  /// per-request `numeric:true` — decimal primary, exact form preserved in
+  /// the envelope's `exactValue`). Recorded on the REQUEST side so a replay
+  /// (V1.9) can reproduce the same display; the envelope alone can't always
+  /// tell (a numeric eval of a statement or error carries no `exact_value`).
+  /// V1.8 additive field, documented in SESSION-FORMAT.md: optional +
+  /// omitted-when-nil, so schema v1 files with or without it round-trip
+  /// unchanged and old readers ignore it — no schema bump.
+  public var numeric: Bool?
 
   public init(
     id: UUID = UUID(),
@@ -113,7 +122,8 @@ public struct SessionRow: Codable, Equatable, Sendable {
     durationSeconds: Double? = nil,
     provenance: Provenance = .cached,
     supersededCache: SupersededCache? = nil,
-    expanded: Bool = false
+    expanded: Bool = false,
+    numeric: Bool? = nil
   ) {
     self.id = id
     self.input = input
@@ -125,6 +135,7 @@ public struct SessionRow: Codable, Equatable, Sendable {
     self.provenance = provenance
     self.supersededCache = supersededCache
     self.expanded = expanded
+    self.numeric = numeric
   }
 }
 

@@ -89,6 +89,10 @@ enum Theme {
     /// Optical alignment of the pane's accessories (chevron, hints, status)
     /// against the editor's first text line.
     static let inputAccessoryTopPadding: CGFloat = 6
+    /// Optical alignment of the pane's small CONTROLS (the V1.8 numeric
+    /// toggle + precision menu) — controls carry their own chrome height,
+    /// so they sit a touch higher than bare-text accessories.
+    static let inputControlTopPadding: CGFloat = 2
 
     // MARK: Ambiguity panel (the inline suggestion panel above the input)
     /// Gap between the panel's bottom edge and the input pane's top edge.

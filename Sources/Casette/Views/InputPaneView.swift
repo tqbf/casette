@@ -38,6 +38,10 @@ struct InputPaneView: View {
                 .animation(.easeOut(duration: 0.15), value: model.draft.isEmpty)
                 .padding(.top, Theme.inputAccessoryTopPadding)
                 .accessibilityHidden(true)
+            // The V1.8 exact/numeric controls: session-scoped, so they live
+            // with the input (next to the kernel status), not in Settings.
+            ExactnessControls(model: model)
+                .padding(.top, Theme.inputControlTopPadding)
             KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
                 .padding(.top, Theme.inputAccessoryTopPadding)
         }

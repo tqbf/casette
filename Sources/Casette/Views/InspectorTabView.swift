@@ -16,8 +16,16 @@ struct InspectorTabView: View {
                         if !result.plain.isEmpty {
                             InspectorMonoField(label: "Plain", value: result.plain)
                         }
+                        if let exact = result.exact {
+                            LabeledContent("Exact", value: exact ? "Yes" : "No")
+                        }
                         if let approx = result.approx {
                             InspectorMonoField(label: "Approx", value: "≈ \(approx)")
+                        }
+                        if let exactValue = result.exactValue {
+                            // A force-numeric row (V0.8): the primary is the
+                            // decimal; the preserved exact form lives here.
+                            InspectorMonoField(label: "Exact Value", value: exactValue)
                         }
                         if let latex = result.latex {
                             // Small rendered preview above the source —

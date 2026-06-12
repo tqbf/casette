@@ -50,6 +50,19 @@ extension SessionRow {
         return sage
     }
 
+    /// The Sage command the card's "Approximate Numerically" context-menu
+    /// item evaluates (`(<expr>).n()`) — exactly the Actions tab's `approx`
+    /// action, surfaced on the card so a full-precision approximation row is
+    /// one click away (V1.8). nil when the worker didn't offer `approx` for
+    /// this kind (matrix/list/plot/error — no scalar approximation; real/
+    /// complex — already numeric) or the row has no reusable expression.
+    var approximateCommand: String? {
+        guard let result, result.actions.contains("approx"),
+              let expression = reusableExpression
+        else { return nil }
+        return ResultAction(name: "approx").command(wrapping: expression)
+    }
+
     /// Applies a finished evaluation to this (pending) row. Identity, input,
     /// sage, and timestamp are untouched — only the outcome fields change.
     /// Provenance becomes `cached` with `cachedAt = date`, matching the V0.10

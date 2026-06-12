@@ -22,6 +22,7 @@ final class FakeKernelTransport: KernelTransport, @unchecked Sendable {
 
     // Recorded signals.
     private var _sentIDs: [String] = []
+    private var _sentObjects: [[String: Any]] = []
     private var _interruptCount = 0
     private var _hardKillCount = 0
     private var _realPID: Int32?
@@ -33,6 +34,14 @@ final class FakeKernelTransport: KernelTransport, @unchecked Sendable {
     }
 
     var lastSentID: String? { sentIDs.last }
+
+    /// Every request object as sent, in order — for asserting the exact
+    /// wire shape (the V1.8 `numeric`/`precision_digits`/`config` fields).
+    var sentObjects: [[String: Any]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _sentObjects
+    }
 
     var interruptCount: Int {
         lock.lock()
@@ -92,6 +101,7 @@ final class FakeKernelTransport: KernelTransport, @unchecked Sendable {
         if let id = object["id"] as? String {
             _sentIDs.append(id)
         }
+        _sentObjects.append(object)
         lock.unlock()
         if let respondToSend {
             for response in respondToSend(object) {
@@ -155,6 +165,28 @@ enum WireFixtures {
             "id": id, "ok": false, "kind": "interrupted",
             "plain": "", "repr": "", "actions": [], "artifacts": [],
             "error": ["type": "KeyboardInterrupt", "message": "eval interrupted", "traceback": ""],
+            "stdout": "", "stderr": "",
+        ]
+    }
+
+    static func configResponse(id: String, precisionDigits: Int, ok: Bool = true) -> [String: Any] {
+        ["id": id, "ok": ok, "op": "config", "precision_digits": precisionDigits]
+    }
+
+    /// A force-numeric value envelope (V0.8): decimal primary, `≈` on the
+    /// primary, the exact form preserved in `exact_value`, secondary null.
+    static func numericEnvelope(
+        id: String,
+        decimal: String,
+        exactValue: String,
+        kind: String = "rational"
+    ) -> [String: Any] {
+        [
+            "id": id, "ok": true, "value": true, "kind": kind,
+            "plain": decimal, "latex": exactValue, "repr": decimal,
+            "approx": NSNull(), "approx_digits": NSNull(),
+            "exact": true, "primary_is_approx": true, "exact_value": exactValue,
+            "actions": [], "artifacts": [], "truncated": false,
             "stdout": "", "stderr": "",
         ]
     }

@@ -134,7 +134,20 @@ actor SessionController {
     /// outcome. Enforces the timeout with SIGINT → hard-kill escalation, and
     /// maps the worker envelope through `EnvelopeMapping` (the frozen
     /// wire → model boundary).
-    func evaluate(_ sage: String) async -> Evaluation {
+    ///
+    /// V0.8 request fields (WORKER-PROTOCOL.md):
+    ///   * `numeric: true` — force-numeric for THIS request only: the primary
+    ///     result becomes its decimal approximation and the exact form is
+    ///     preserved in `exact_value`. Display-only — the worker guarantees
+    ///     the namespace is never mutated (`y = 1/3` stays a Rational).
+    ///   * `precisionDigits` — a per-request precision override (decimal
+    ///     digits) for `approx`/the numeric primary. Does not change the
+    ///     session default (that's the `config` op — `configure(precisionDigits:)`).
+    func evaluate(
+        _ sage: String,
+        numeric: Bool = false,
+        precisionDigits: Int? = nil
+    ) async -> Evaluation {
         // Boot grace: if the kernel is still coming up, wait for it to
         // resolve (boot always ends in idle or notConnected).
         await waitWhileBootingOrBusy()
@@ -157,8 +170,15 @@ actor SessionController {
         let started = clock.now
         let deadline = started + configuration.evalTimeout
 
+        var request: [String: Any] = ["id": requestID, "code": sage]
+        if numeric {
+            request["numeric"] = true
+        }
+        if let precisionDigits {
+            request["precision_digits"] = precisionDigits
+        }
         do {
-            try kernel.send(["id": requestID, "code": sage])
+            try kernel.send(request)
         } catch {
             return failGeneration(
                 myGeneration,
@@ -275,6 +295,34 @@ actor SessionController {
             try? await Task.sleep(for: configuration.pollInterval)
         }
         return nil
+    }
+
+    /// Sets the worker's session-level approximation precision (the V0.8
+    /// `config` op — `precision_digits`, worker default 10). Applies to every
+    /// subsequent eval's `approx` until changed; the worker holds it as
+    /// session state, so the model re-applies it after boot/restart (like the
+    /// boot prelude). Returns whether the worker accepted the setting (it
+    /// rejects non-positive values and leaves the session unchanged).
+    func configure(precisionDigits: Int) async -> Bool {
+        await waitWhileBootingOrBusy()
+        guard state.canAcceptWork, let kernel = transport else { return false }
+        let requestID = nextRequestID(prefix: "config")
+        requestInFlight = true
+        defer { requestInFlight = false }
+        guard (try? kernel.send([
+            "id": requestID, "op": "config", "precision_digits": precisionDigits,
+        ])) != nil else { return false }
+
+        let clock = ContinuousClock()
+        let deadline = clock.now + configuration.metadataTimeout
+        let myGeneration = generation
+        while clock.now < deadline, generation == myGeneration, !kernel.isAtEOF {
+            if let response = kernel.dequeue(where: { ($0["id"] as? String) == requestID }) {
+                return response["ok"] as? Bool ?? false
+            }
+            try? await Task.sleep(for: configuration.pollInterval)
+        }
+        return false
     }
 
     // MARK: - Boot

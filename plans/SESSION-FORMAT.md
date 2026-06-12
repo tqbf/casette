@@ -89,6 +89,25 @@ inspectable") and diff-stable. A real recorded file:
 | `provenance` | object | cached vs replayed (below) |
 | `supersededCache` | object? | a differing replay's retained old envelope (below) |
 | `expanded` | bool | UI state (`expanded/collapsed`) |
+| `numeric` | bool? | the row was evaluated FORCE-NUMERIC (the V0.8 per-request `numeric:true`) — see the V1.8 note below |
+
+> **V1.8 additive change (same pattern as V1.5's `truncation` and V1.7's
+> artifact `error`):** a row gains the optional `numeric` flag, `true` only
+> when it was submitted in numeric mode (decimal primary; the exact form
+> preserved in the envelope's `exactValue`). Recorded on the REQUEST side
+> because the envelope alone can't always tell (a numeric eval of a statement
+> or error carries no `exact_value`), and because V1.9's **replay must re-send
+> the request shape, not just the `sage`** — a numeric row replays with
+> `numeric:true` so the restored display matches what the user saw. Optional
+> and omitted-when-nil (a normal row's JSON is byte-unchanged), so schema
+> **v1** files with or without it round-trip and old readers ignore it — no
+> schema bump. The app's rerun already honors it (a numeric row reruns
+> numeric, regardless of the toggle's current state).
+>
+> Relatedly, the session header's `precisionDigits` (present since V0.10) is
+> now LIVE: the V1.8 precision control writes it, the boot/restart path
+> re-applies it to the worker (`config` op) whenever it differs from the
+> worker default 10, and V1.9 restores it with the session.
 
 The **input vs sage** distinction is exactly the FRIENDLY-COMPILER.md split: a
 friendly input (`factor x^4 - 1`) stores both the raw text and the compiled Sage;

@@ -56,6 +56,35 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.8 done (live gate PASSED, all 14 checks; round-1's "tab bar opens Time
+Machine" was a verifier-side overlapping System Settings window, proven in
+round 2) — exactness is a product feature.** The
+default exact display (exact primary, `≈ approx` secondary) was verified
+intact; the new controls: a sticky **"≈ Numeric" toggle** in the input pane
+(+ a checked Sage-menu mirror) that sends the V0.8 per-request `numeric:true`
+on typed submissions only — display-only (worker-guaranteed namespace
+purity), recorded per row (`SessionRow.numeric`, the ONE additive schema
+field, SESSION-FORMAT.md), reproduced by rerun, never applied to sidebar
+flows; a session-scoped **precision menu** ("10 digits" → 5–50) wired to the
+worker `config` op through the serial kernel queue and **re-applied after
+boot/restart** whenever it differs from the worker default 10 (the session
+header's `precisionDigits` is now live); **Approximate Numerically** on the
+card's context menu (a fresh selected `(expr).n()` row, shown exactly when
+the envelope offers `approx`); copyable ≈/exact lines; force-numeric cards
+render the decimal `plain` as the hero (never the exact-form `latex`) with a
+`= 1/3 exactly` secondary + an Inspector Exact Value field. Kernel API:
+`SessionController.evaluate(_:numeric:precisionDigits:)` +
+`configure(precisionDigits:)` (the `config` op); `restartKernel`'s re-init
+(prelude + precision + symbols) now CHAINS on the kernel queue behind an
+un-chained `restart()` — fixing a latent post-restart race the gate caught
+(new PROBLEMS.md entry). `make check` / **`make test` 249/249** (+13:
+wire-shape, config-op, numeric-scope/rerun, precision-reapply, Codable, and
+3 real-Sage journeys incl. namespace purity and 20-digit precision) /
+`make build` green; full V0 regression clean (exact counts in PROGRESS.md);
+launch/quit clean, `pgrep` clean. **On-screen verifier checklist (14 items)
+in PROGRESS.md — pending.** **Next: V1.9 — session persistence** (after the
+V1.8 live gate passes).
+
 **V1.7 done (live gate PASSED after one fix round — all hang repros dead at
 0.0–0.1% CPU under a 2-minute mixed-interaction stress; implicit_plot works
 out of the box).** The first live gate failed on (1) an

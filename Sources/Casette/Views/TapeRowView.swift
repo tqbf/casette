@@ -16,6 +16,11 @@ struct TapeRowView: View {
     /// Re-evaluates this row's input as a fresh tape row (the plot card's
     /// missing-PNG regenerate affordance — V1.7).
     let onRerun: () -> Void
+    /// Evaluates the row's `approx` action command (`(<expr>).n()`) as a
+    /// fresh, selected tape row — the V1.8 "approximation is one click away"
+    /// context-menu affordance. Offered only when `row.approximateCommand`
+    /// exists (the worker listed `approx` for this kind).
+    let onApproximate: () -> Void
 
     @State private var isHovered = false
 
@@ -80,11 +85,21 @@ struct TapeRowView: View {
             if let plain = row.result?.plain, !plain.isEmpty {
                 Button("Copy Result") { Pasteboard.copy(plain) }
             }
+            if let approx = row.result?.approx {
+                Button("Copy Approximation") { Pasteboard.copy(approx) }
+            }
+            if let exactValue = row.result?.exactValue {
+                Button("Copy Exact Value") { Pasteboard.copy(exactValue) }
+            }
             if let latex = row.result?.latex {
                 Button("Copy LaTeX") { Pasteboard.copy(latex) }
             }
             if let traceback = row.result?.error?.traceback, !traceback.isEmpty {
                 Button("Copy Traceback") { Pasteboard.copy(traceback) }
+            }
+            if row.approximateCommand != nil {
+                Divider()
+                Button("Approximate Numerically", action: onApproximate)
             }
         }
     }
@@ -105,7 +120,7 @@ struct TapeRowView: View {
         ForEach(PlaceholderData.rows.prefix(4)) { row in
             TapeRowView(
                 row: row, isSelected: false, isKernelConnected: false,
-                onSelect: {}, onToggleExpanded: {}, onRerun: {}
+                onSelect: {}, onToggleExpanded: {}, onRerun: {}, onApproximate: {}
             )
         }
     }

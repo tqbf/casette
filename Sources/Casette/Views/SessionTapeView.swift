@@ -25,7 +25,8 @@ struct SessionTapeView: View {
                                 isKernelConnected: model.kernelState.isConnected,
                                 onSelect: { model.select(row.id) },
                                 onToggleExpanded: { model.toggleExpanded(rowID: row.id) },
-                                onRerun: { model.rerun(rowID: row.id) }
+                                onRerun: { model.rerun(rowID: row.id) },
+                                onApproximate: { model.approximateNumerically(rowID: row.id) }
                             )
                             .id(row.id)
                         }
