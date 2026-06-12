@@ -38,7 +38,7 @@ inspectable") and diff-stable. A real recorded file:
   "created" : "2026-06-11T21:26:19Z",
   "updated" : "2026-06-11T21:26:22Z",
   "sageVersion" : "9.5",
-  "precisionDigits" : 10,
+  "precisionDigits" : 5,
   "rows" : [
     {
       "id" : "8922C500-FAB7-447E-8759-FAE6D3BC3308",
@@ -107,7 +107,9 @@ inspectable") and diff-stable. A real recorded file:
 > Relatedly, the session header's `precisionDigits` (present since V0.10) is
 > now LIVE: the V1.8 precision control writes it, the boot/restart path
 > re-applies it to the worker (`config` op) whenever it differs from the
-> worker default 10, and V1.9 restores it with the session.
+> worker default 10, and V1.9 restores it with the session. Casette's app-side
+> default is 5 digits, so fresh app sessions configure the worker from its
+> native 10-digit default down to 5 at boot.
 
 The **input vs sage** distinction is exactly the FRIENDLY-COMPILER.md split: a
 friendly input (`factor x^4 - 1`) stores both the raw text and the compiled Sage;
@@ -328,4 +330,3 @@ strict decoding would also fail.
   mapping is stable. New worker fields are additive and map to nil until added
   here.
 ```
-

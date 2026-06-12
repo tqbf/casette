@@ -16,7 +16,7 @@ struct ExactnessControls: View {
     /// The offered precision values. The current session value is always
     /// included (a V1.9-restored session may carry a non-listed precision —
     /// the menu must never show a blank selection).
-    private static let standardDigits = [5, 10, 15, 20, 30, 50]
+    private static let standardDigits = [2, 3, 5, 10, 15, 20, 30, 50]
 
     var body: some View {
         HStack(spacing: Theme.inputElementSpacing) {

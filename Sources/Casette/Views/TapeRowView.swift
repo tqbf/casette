@@ -8,6 +8,7 @@ import SwiftUI
 /// clear (§7.2). Copy lives on the context menu plus a hover-revealed
 /// button (§4.5 — opacity fade, never insert-on-hover).
 struct TapeRowView: View {
+    let rowNumber: Int
     let row: SessionRow
     let isSelected: Bool
     let isKernelConnected: Bool
@@ -47,6 +48,12 @@ struct TapeRowView: View {
                 .rotationEffect(.degrees(row.expanded ? 90 : 0))
                 .animation(.easeOut(duration: 0.12), value: row.expanded)
                 .help(row.expanded ? "Collapse details" : "Show input, generated Sage, and plain text")
+                Text("#\(rowNumber)")
+                    .font(Theme.Fonts.meta)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                    .help("Tape entry \(rowNumber)")
+                    .accessibilityLabel("Tape entry \(rowNumber)")
                 Text(row.input)
                     .font(Theme.Fonts.rowInput)
                     .foregroundStyle(.secondary)
@@ -151,7 +158,7 @@ struct TapeRowView: View {
     VStack(spacing: 2) {
         ForEach(PlaceholderData.rows.prefix(4)) { row in
             TapeRowView(
-                row: row, isSelected: false, isKernelConnected: false,
+                rowNumber: 1, row: row, isSelected: false, isKernelConnected: false,
                 isLiveInKernel: true,
                 onSelect: {}, onToggleExpanded: {}, onRerun: {}, onApproximate: {}
             )

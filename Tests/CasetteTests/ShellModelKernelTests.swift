@@ -73,7 +73,8 @@ struct ShellModelKernelTests {
         #expect(await eventually { @MainActor in model.rows.allSatisfy { $0.status == .ok } })
         // The boot prelude (the calculator variables var('x, y, z, t'))
         // leads, then the submissions strictly in tape order.
-        #expect(order.values == [ShellModel.bootPrelude, "a = 1\na", "b = 2\nb", "a + b"])
+        #expect(order.values.filter { !$0.contains("__casette_tape_refs") && $0 != "?" }
+            == [ShellModel.bootPrelude, "a = 1\na", "b = 2\nb", "a + b"])
     }
 
     @Test("boot and restart each apply the var('x, y, z, t') prelude — the calculator-variables contract")
@@ -102,7 +103,9 @@ struct ShellModelKernelTests {
         // Boot: the prelude is the FIRST eval, before any submission, and
         // the sidebar refreshes — all four calculator variables are visible
         // from boot.
-        #expect(await eventually { @MainActor in order.values == ["var('x, y, z, t')"] })
+        #expect(await eventually { @MainActor in
+            order.values.filter { $0 != "?" } == ["var('x, y, z, t')"]
+        })
         #expect(await eventually { @MainActor in
             model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
         })
@@ -111,12 +114,14 @@ struct ShellModelKernelTests {
         model.draft = "expand((x+1)^8)"
         model.submitDraft()
         #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
-        #expect(order.values == ["var('x, y, z, t')", "expand((x+1)^8)"])
+        #expect(order.values.filter { !$0.contains("__casette_tape_refs") && $0 != "?" }
+            == ["var('x, y, z, t')", "expand((x+1)^8)"])
 
         // Restart boots a fresh namespace — the prelude must be re-applied.
         model.restartKernel()
         #expect(await eventually { @MainActor in
-            order.values == ["var('x, y, z, t')", "expand((x+1)^8)", "var('x, y, z, t')"]
+            order.values.filter { !$0.contains("__casette_tape_refs") && $0 != "?" }
+                == ["var('x, y, z, t')", "expand((x+1)^8)", "var('x, y, z, t')"]
         })
     }
 

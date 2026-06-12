@@ -115,7 +115,7 @@ struct SidebarFlowTests {
         model.rerun(rowID: model.rows[0].id)
         #expect(await eventually { @MainActor in model.rows.count == 2 && model.rows[1].status == .ok })
         // Boot prelude, then BOTH submissions each led by var('t').
-        #expect(order.values == [
+        #expect(order.values.filter { !$0.contains("__casette_tape_refs") && $0 != "?" } == [
             ShellModel.bootPrelude,
             "var('t')", "integrate(t^2, (t, 0, 2))",
             "var('t')", "integrate(t^2, (t, 0, 2))",

@@ -55,18 +55,43 @@ struct CompiledInput: Equatable, Sendable {
     /// statements. So anything containing a newline bypasses untouched
     /// (except smart-quote normalization, which applies to everything —
     /// see `normalizingSmartQuotes`).
-    static func compile(_ rawInput: String) -> Outcome {
+    static func compile(
+        _ rawInput: String,
+        tapeReferences: TapeReferenceTable = .empty
+    ) -> Outcome {
         let input = normalizingSmartQuotes(rawInput)
-        guard !input.contains("\n") else { return .ready(.bypass(input)) }
-        switch FriendlyCompiler.compile(input) {
+        let expandedInput: String
+        switch tapeReferences.expandReferences(in: input) {
+        case let .success(expanded):
+            expandedInput = expanded
+        case let .failure(error):
+            return .error(error)
+        }
+
+        guard !expandedInput.contains("\n") else {
+            return .ready(CompiledInput(
+                raw: input,
+                sage: expandedInput,
+                requiredVariables: [],
+                origin: .bypass
+            ))
+        }
+        switch FriendlyCompiler.compile(expandedInput) {
         case let .success(generatedSage, requiredVariables):
             return .ready(CompiledInput(
                 raw: input,
                 sage: generatedSage,
-                requiredVariables: requiredVariables,
+                requiredVariables: requiredVariables.filter {
+                    $0 != TapeReferenceTable.variableName
+                },
                 origin: .friendly))
         case .bypass:
-            return .ready(.bypass(input))
+            return .ready(CompiledInput(
+                raw: input,
+                sage: expandedInput,
+                requiredVariables: [],
+                origin: .bypass
+            ))
         case let .error(error):
             return .error(error)
         case let .ambiguous(candidates):

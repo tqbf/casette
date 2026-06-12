@@ -289,6 +289,55 @@ struct ShellModelInputTests {
         }
     }
 
+    @Test("tape references use visible row numbers but only successful reusable rows are valid")
+    func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
+        let rows = [
+            SessionRow(
+                input: "2 + 2", sage: "2 + 2",
+                result: PersistedEnvelope(kind: "integer", plain: "4"),
+                status: .ok, timestamp: .now
+            ),
+            SessionRow(
+                input: "1/0", sage: "1/0",
+                result: PersistedEnvelope(kind: "error", plain: "division by zero"),
+                status: .error, timestamp: .now
+            ),
+            SessionRow(
+                input: "3 + 3", sage: "3 + 3",
+                result: PersistedEnvelope(kind: "integer", plain: "6"),
+                status: .ok, timestamp: .now
+            ),
+        ]
+        let model = ShellModel(rows: rows)
+        #expect(model.tapeReferences.entries.keys.sorted() == [1, 3])
+
+        model.draft = "#3 + #1"
+        #expect(model.draftPreview == .rawSage)
+        model.submitDraft()
+        #expect(model.rows.last?.input == "#3 + #1")
+        #expect(model.rows.last?.sage == "__casette_tape_refs[3] + __casette_tape_refs[1]")
+
+        model.draft = "#2 + 1"
+        guard case let .issue(message, _) = model.draftPreview else {
+            Issue.record("expected .issue")
+            return
+        }
+        #expect(message.contains("#2"))
+    }
+
+    @Test("tape references keep only the last twenty successful reusable rows")
+    func tapeReferencesKeepLastTwenty() {
+        let rows = (1...25).map { rowNumber in
+            SessionRow(
+                input: "\(rowNumber)", sage: "\(rowNumber)",
+                result: PersistedEnvelope(kind: "integer", plain: "\(rowNumber)"),
+                status: .ok, timestamp: .now
+            )
+        }
+        let model = ShellModel(rows: rows)
+        #expect(model.tapeReferences.entries.keys.sorted() == Array(6...25))
+    }
+
     @Test("multiline drafts preview as raw Sage")
     func multilinePreviewIsRaw() {
         let model = ShellModel()
@@ -323,7 +372,9 @@ struct ShellModelInputTests {
         #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
         // The boot prelude leads (every boot applies it, V1.5 fix round),
         // then the submission's own prelude, then the generated Sage.
-        #expect(order.values == [ShellModel.bootPrelude, "var('t')", "integrate(t^2, (t, 0, 2))"])
+        let userEvalOrder = order.values.filter { $0 != "?" }
+        #expect(userEvalOrder.prefix(3) == [ShellModel.bootPrelude, "var('t')", "integrate(t^2, (t, 0, 2))"])
+        #expect(order.values.last?.contains("__casette_tape_refs[1]") == true)
         // The row's envelope is the MAIN eval's, not a prelude's.
         #expect(model.rows[0].result?.plain == "8/3")
         #expect(model.rows[0].sage == "integrate(t^2, (t, 0, 2))")

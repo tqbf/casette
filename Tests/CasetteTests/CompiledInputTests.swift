@@ -114,6 +114,33 @@ struct CompiledInputTests {
         #expect(plain.sage == "print(\"hello\")")
     }
 
+    @Test("tape references expand to the private Sage reference dict")
+    func tapeReferencesExpand() {
+        let references = TapeReferenceTable(entries: [57: "factor(x^4 - 1)"])
+        guard case let .ready(compiled) =
+            CompiledInput.compile("expand #57", tapeReferences: references)
+        else {
+            Issue.record("expected .ready")
+            return
+        }
+        #expect(compiled.raw == "expand #57")
+        #expect(compiled.sage == "expand(__casette_tape_refs[57])")
+        #expect(compiled.origin == .friendly)
+        #expect(compiled.preludes.isEmpty)
+    }
+
+    @Test("missing tape references are compile errors")
+    func missingTapeReferenceErrors() {
+        guard case let .error(error) =
+            CompiledInput.compile("#57 + 1", tapeReferences: TapeReferenceTable(entries: [56: "2"]))
+        else {
+            Issue.record("expected .error")
+            return
+        }
+        #expect(error.message.contains("#57"))
+        #expect(error.suggestion?.contains("20") == true)
+    }
+
     @Test("a chosen ambiguity candidate re-derives its required variables")
     func chosenCandidateVariables() {
         let compiled = CompiledInput.chosenCandidate(

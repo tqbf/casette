@@ -27,6 +27,7 @@ import Foundation
 /// The current on-disk schema version. Bump only on a breaking change; restore
 /// refuses a version it doesn't recognize (forward-incompatible → polite refusal).
 public let currentSchemaVersion = 1
+public let defaultSessionPrecisionDigits = 5
 
 // MARK: Session
 
@@ -57,7 +58,7 @@ public struct Session: Codable, Equatable, Sendable {
     created: Date,
     updated: Date,
     sageVersion: String? = nil,
-    precisionDigits: Int = 10,
+    precisionDigits: Int = defaultSessionPrecisionDigits,
     rows: [SessionRow] = []
   ) {
     self.schemaVersion = schemaVersion

@@ -272,6 +272,7 @@ struct SessionControllerTests {
                         id: id,
                         entries: [
                             ("A", "matrix", "2×2 over Integer Ring"),
+                            ("__casette_tape_refs", "dict", "{1: 4}"),
                             ("x", "symbolic variable", "x"),
                         ])
                 ]

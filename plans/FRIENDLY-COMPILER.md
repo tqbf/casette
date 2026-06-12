@@ -124,6 +124,41 @@ user can paste arbitrary Sage and it flows straight through.
 
 ---
 
+## Tape reference precompile pass (V1.10 maintenance)
+
+This is **app-side**, not part of the frozen `FriendlyCompiler` grammar:
+`CompiledInput.compile(_:tapeReferences:)` first expands tape references of the
+form `#ROW` before handing the line to `FriendlyCompiler.compile`.
+
+Policy:
+
+- Tape row numbers are **visible, 1-based transcript positions**. Every row gets
+  a number, including error rows.
+- Only the **last 20 successful reusable expressions** are valid references.
+  Error/interrupted/running rows and statement-only rows are skipped, but their
+  row numbers remain occupied.
+- A valid `#57` expands to the private Sage dictionary lookup
+  `__casette_tape_refs[57]`. The compiler filters that private dictionary name
+  out of `requiredVariables`, so friendly commands like `expand #57` never emit
+  `var('__casette_tape_refs')`.
+- Missing/stale references are compile errors shown through the normal preview
+  path; nothing is submitted.
+- After each successful row eval (and during Replay Session), `ShellModel`
+  refreshes `__casette_tape_refs` in the worker namespace and prunes entries
+  outside the current 20-reference window.
+
+Examples:
+
+| Prompt | Generated/evaluated Sage |
+| --- | --- |
+| `#57 + 1` | `__casette_tape_refs[57] + 1` |
+| `expand #57` | `expand(__casette_tape_refs[57])` |
+
+The row's `input` remains the user-facing prompt (`expand #57`); the row's
+`sage` records the expanded source that actually evaluated.
+
+---
+
 ## Variable policy
 
 **The compiler reports required variables; it never injects declarations.** The
