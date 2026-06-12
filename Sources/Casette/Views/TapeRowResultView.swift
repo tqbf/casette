@@ -41,7 +41,7 @@ struct TapeRowResultView: View {
         case .interrupted:
             stdoutAndThen { errorBody(tint: .orange, fallbackTitle: "Interrupted") }
         case .statement:
-            // A statement echoes no value; only captured output shows.
+            // A no-value statement only shows captured output.
             if let stdout = row.result?.stdout {
                 StdoutBlockView(stdout: stdout)
             }

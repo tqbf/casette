@@ -32,7 +32,7 @@ enum PlaceholderData {
             )
         }
 
-        /// An assignment echoes no value (V0.1 None-suppression).
+        /// A worker statement with no value (V0.1 None-suppression).
         let statement = PersistedEnvelope(kind: "none", plain: "")
 
         return [

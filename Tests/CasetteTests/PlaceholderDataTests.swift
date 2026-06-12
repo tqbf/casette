@@ -10,7 +10,7 @@ struct PlaceholderDataTests {
         #expect(!rows.isEmpty)
         // A value row with an ≈ secondary line (the V0.8 display policy).
         #expect(rows.contains { $0.status == .ok && $0.result?.approx != nil })
-        // A statement row (assignment — echoes no value).
+        // A statement row (`del`, print-only code, or other no-value result).
         #expect(rows.contains { $0.isStatement })
         // A plot row and an error row (with structured error detail).
         #expect(rows.contains { $0.isPlot })

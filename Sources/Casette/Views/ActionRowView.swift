@@ -4,7 +4,7 @@ import SwiftUI
 /// the concrete Sage command it builds previewed underneath (the command IS
 /// what runs — V1.11's "actions generate visible Sage commands", visible
 /// already). Three shapes:
-///   * command  — click inserts into the input; context menu evaluates/copies
+///   * command  — click evaluates; context menu inserts/copies
 ///   * copy     — click copies the value
 ///   * disabled — listed but inert, with the reason in a tooltip
 struct ActionRowView: View {
@@ -34,19 +34,18 @@ struct ActionRowView: View {
             .buttonStyle(.plain)
             .help("Copy to the clipboard")
         } else {
-            Button(action: { onInsert?() }) {
+            Button(action: { onEvaluate?() }) {
                 label.contentShape(.rect)
             }
             .buttonStyle(.plain)
             .contextMenu {
                 Button("Insert into Input") { onInsert?() }
-                Button("Evaluate Now") { onEvaluate?() }
                 if let command {
                     Button("Copy Command") { Pasteboard.copy(command) }
                 }
             }
-            .accessibilityHint("Inserts the Sage command into the input")
-            .help("Click to insert into the input; right-click to evaluate now")
+            .accessibilityHint("Evaluates the Sage command")
+            .help("Click to evaluate now; right-click to insert into the input")
         }
     }
 

@@ -73,7 +73,7 @@ struct ShellModelKernelTests {
         #expect(await eventually { @MainActor in model.rows.allSatisfy { $0.status == .ok } })
         // The boot prelude (the calculator variables var('x, y, z, t'))
         // leads, then the submissions strictly in tape order.
-        #expect(order.values == [ShellModel.bootPrelude, "a = 1", "b = 2", "a + b"])
+        #expect(order.values == [ShellModel.bootPrelude, "a = 1\na", "b = 2\nb", "a + b"])
     }
 
     @Test("boot and restart each apply the var('x, y, z, t') prelude — the calculator-variables contract")

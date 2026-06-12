@@ -154,6 +154,24 @@ struct ShellModelTests {
         #expect(model.historyRows.last?.id == PlaceholderData.rows.first?.id)
     }
 
+    @Test("clearing the tape removes rows and selection")
+    func clearTapeRemovesRowsAndSelection() {
+        let model = ShellModel(rows: PlaceholderData.rows)
+        model.select(PlaceholderData.rows[1].id)
+        let before = model.session.updated
+        let clearedAt = before.addingTimeInterval(60)
+
+        #expect(model.canClearTape)
+
+        model.clearTape(at: clearedAt)
+
+        #expect(model.rows.isEmpty)
+        #expect(model.historyRows.isEmpty)
+        #expect(model.selectedRow == nil)
+        #expect(!model.canClearTape)
+        #expect(model.session.updated == clearedAt)
+    }
+
     @Test("insert into draft replaces the draft")
     func insertIntoDraft() {
         let model = ShellModel()

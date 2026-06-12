@@ -68,8 +68,23 @@ struct SpecForms {
     @Test func taylor() { expectSuccess("taylor sin(x), x=0, order=7", "taylor(sin(x), x, 0, 7)") }
     @Test func plot() { expectSuccess("plot sin(x), x=-pi..pi", "plot(sin(x), (x, -pi, pi))") }
     @Test func matrix() { expectSuccess("matrix [[1,2],[3,4]]", "matrix([[1,2],[3,4]])") }
+    @Test func matlabMatrix() {
+        expectSuccess("matrix [1, 2, 3 ; 2, 3, 4 ]", "matrix([[1,2,3],[2,3,4]])")
+    }
+    @Test func matlabMatrixStandalone() {
+        expectSuccess("[1, 2, 3 ; 2, 3, 4 ]", "matrix([[1,2,3],[2,3,4]])")
+    }
+    @Test func matlabMatrixAssignment() {
+        expectSuccess("A = [1, 2, 3 ; 2, 3, 4 ]", "A = matrix([[1,2,3],[2,3,4]])\nA")
+    }
     @Test func eigenvalues() { expectSuccess("eigenvalues [[1,2],[3,4]]", "matrix([[1,2],[3,4]]).eigenvalues()") }
+    @Test func eigenvaluesMatlabMatrix() {
+        expectSuccess("eigenvalues [1,2;3,4]", "matrix([[1,2],[3,4]]).eigenvalues()")
+    }
     @Test func rref() { expectSuccess("rref [[1,2],[3,4]]", "matrix([[1,2],[3,4]]).rref()") }
+    @Test func rrefMatlabMatrix() {
+        expectSuccess("rref [1,2,3;4,5,6]", "matrix([[1,2,3],[4,5,6]]).rref()")
+    }
 }
 
 // MARK: - The double-integral nesting (load-bearing)
@@ -101,7 +116,12 @@ struct DoubleIntegralNesting {
 struct Bypass {
     @Test func arithmetic() { expectBypass("2+2") }
     @Test func alreadyCallSyntax() { expectBypass("factor(x^4-1)") }
-    @Test func assignment() { expectBypass("A = matrix([[1,2],[3,4]])") }
+    @Test func assignmentEchoesAssignedVariable() {
+        expectSuccess("A = matrix([[1,2],[3,4]])", "A = matrix([[1,2],[3,4]])\nA")
+    }
+    @Test func listAssignmentEchoesAssignedVariable() {
+        expectSuccess("A = [1, 2, 3]", "A = [1, 2, 3]\nA")
+    }
     @Test func bareExpression() { expectBypass("sin(pi/3)") }
     // `factorial` starts with `factor` but is NOT the command (no space after).
     @Test func factorialNotFactor() { expectBypass("factorial(5)") }
@@ -143,6 +163,15 @@ struct Errors {
     }
     @Test func matrixNotBracketed() {
         #expect(expectError("matrix (1,2)") != nil)
+    }
+    @Test func matlabMatrixRejectsEmptyRow() {
+        #expect(expectError("matrix [1,2; ]") != nil)
+    }
+    @Test func matlabMatrixRejectsEmptyCell() {
+        #expect(expectError("matrix [1,,2; 3,4,5]") != nil)
+    }
+    @Test func matlabMatrixAssignmentRejectsEmptyCell() {
+        #expect(expectError("A = [1,,2; 3,4,5]") != nil)
     }
     @Test func unbalancedParen() {
         let e = expectError("expand (x+1")

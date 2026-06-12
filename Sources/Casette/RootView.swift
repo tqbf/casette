@@ -19,6 +19,7 @@ struct RootView: View {
     /// stays on `ShellModel` (sidebar flows switch tabs); this is just the
     /// durable copy, synced both ways below.
     @AppStorage(UILayout.sidebarTabKey) private var storedSidebarTab = SidebarTab.symbols.rawValue
+    @State private var isConfirmingClearTape = false
     @FocusState private var isInputFocused: Bool
 
     /// Previews pass false so opening a canvas never spawns a Sage process —
@@ -55,7 +56,16 @@ struct RootView: View {
                 )
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: confirmClearTape) {
+                    Label("Clear Tape", systemImage: "trash")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .disabled(!model.canClearTape)
+                .help("Clear all rows from the tape")
+
                 Button(
                     "Hide or Show Sidebar",
                     systemImage: "sidebar.trailing",
@@ -69,6 +79,19 @@ struct RootView: View {
         .defaultFocus($isInputFocused, true)
         .sheet(isPresented: $model.isDoctorPresented) {
             DoctorSheetView(model: doctorModel, reconnect: model.restartKernel)
+        }
+        .confirmationDialog(
+            "Clear Tape?",
+            isPresented: $isConfirmingClearTape,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Tape", role: .destructive) {
+                model.clearTape()
+                focusInput()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every row from the tape. Sage variables stay available.")
         }
         .onChange(of: model.sidebarTab) {
             storedSidebarTab = model.sidebarTab.rawValue
@@ -88,6 +111,10 @@ struct RootView: View {
 
     private func toggleSidebar() {
         isSidebarPresented.toggle()
+    }
+
+    private func confirmClearTape() {
+        isConfirmingClearTape = true
     }
 
     private func focusInput() {

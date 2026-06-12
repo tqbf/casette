@@ -116,6 +116,8 @@ final class ShellModel {
 
     var rows: [SessionRow] { session.rows }
 
+    var canClearTape: Bool { !session.rows.isEmpty }
+
     var selectedRow: SessionRow? {
         guard let selectedRowID else { return nil }
         return session.rows.first { $0.id == selectedRowID }
@@ -598,9 +600,9 @@ final class ShellModel {
 
     // MARK: - Sidebar: result actions
 
-    /// Actions tab → Evaluate Now: submits an action's built command directly
-    /// (the insert-into-input path is just `insertIntoDraft`) and selects the
-    /// new row so the Inspector and Actions follow the fresh result.
+    /// Actions tab primary click: submits an action's built command directly
+    /// (the context-menu insert path is just `insertIntoDraft`) and selects
+    /// the new row so the Inspector and Actions follow the fresh result.
     func evaluateActionCommand(_ command: String) {
         guard let rowID = submitProgrammatically(command) else { return }
         select(rowID)
@@ -710,6 +712,19 @@ final class ShellModel {
         session.updated = date
         persist()  // a crash now restores the row as honestly incomplete
         return row.id
+    }
+
+    /// Clears the visible/persisted tape without resetting the live Sage
+    /// namespace. This is closer to a calculator "clear tape" than a kernel
+    /// restart: variables still exist, but the transcript and selection are
+    /// gone.
+    func clearTape(at date: Date = .now) {
+        guard !session.rows.isEmpty else { return }
+        session.rows.removeAll()
+        session.updated = date
+        selectedRowID = nil
+        restoredRowIDs.removeAll()
+        persist()
     }
 
     /// Applies a finished evaluation to its pending row (the V1.3 seam).
