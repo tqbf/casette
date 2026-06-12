@@ -37,7 +37,30 @@ final class ShellModel {
     /// crash, forced stop) — drives the recovery banner. nil when healthy.
     private(set) var kernelIssue: String?
     var selectedRowID: SessionRow.ID?
-    var draft = ""
+    /// The input draft. Any change that is NOT a history recall counts as a
+    /// user edit: it dismisses a pending ambiguity picker (the candidates
+    /// describe text that no longer exists) and ends history navigation (the
+    /// next Up starts from the newest entry — standard shell behavior). A
+    /// recall changes the draft too, but must not end the navigation it is
+    /// part of, so it announces itself via `isRecallingHistory`.
+    var draft = "" {
+        didSet {
+            guard draft != oldValue else { return }
+            pendingAmbiguity = nil
+            if !isRecallingHistory {
+                inputHistory.endNavigation()
+            }
+        }
+    }
+    /// An ambiguous submission awaiting the user's pick (drives the inline
+    /// candidate panel above the input). Transient UI state, never persisted.
+    var pendingAmbiguity: PendingAmbiguity?
+    /// Command history (the session's submitted inputs) behind Up/Down.
+    private(set) var inputHistory = InputHistory()
+
+    /// True while a history recall is writing the draft, so `draft.didSet`
+    /// can tell a recall apart from a user edit.
+    @ObservationIgnored private var isRecallingHistory = false
 
     private var controller: SessionController?
     @ObservationIgnored private var statusTask: Task<Void, Never>?
@@ -101,23 +124,145 @@ final class ShellModel {
         Task { await controller.interruptCurrent() }
     }
 
-    /// Compile (V1.4 — bypass-only for now), append a pending row, and
-    /// evaluate it through the serial kernel queue.
+    // MARK: - Input compilation & submission
+
+    /// The live compile of the current draft, for the preview line under the
+    /// input field. Pure and microsecond-fast, so recomputing per keystroke
+    /// is fine — friendly → Sage is always inspectable before submitting.
+    var draftPreview: DraftPreview {
+        let input = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return .empty }
+        switch CompiledInput.compile(input) {
+        case let .ready(compiled):
+            return compiled.origin == .friendly ? .generated(compiled.sage) : .rawSage
+        case let .error(error):
+            return .issue(message: error.message, suggestion: error.suggestion)
+        case let .ambiguous(candidates):
+            return .ambiguous(count: candidates.count)
+        }
+    }
+
+    /// Return: compile and evaluate, advancing (the draft clears).
     func submitDraft() {
+        submit(advancing: true)
+    }
+
+    /// ⌘-Return: compile and evaluate WITHOUT advancing — the input stays in
+    /// place so the user can iterate on it.
+    func evaluateInPlace() {
+        submit(advancing: false)
+    }
+
+    /// Compile the draft and act on the outcome. A compile error submits
+    /// nothing and keeps the draft (the preview line already explains it);
+    /// ambiguity hands the candidates to the picker.
+    private func submit(advancing: Bool) {
         let input = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
-        let compiled = CompiledInput.bypass(input)
+        switch CompiledInput.compile(input) {
+        case let .ready(compiled):
+            submitCompiled(compiled, advancing: advancing)
+        case .error:
+            break  // shown inline by `draftPreview`; no row, draft kept
+        case let .ambiguous(candidates):
+            pendingAmbiguity = PendingAmbiguity(
+                raw: input, candidates: candidates, advances: advancing)
+        }
+    }
+
+    /// The user picked an ambiguity candidate: it evaluates as a friendly
+    /// submission of the original raw input.
+    func resolveAmbiguity(choosing candidate: String) {
+        guard let pending = pendingAmbiguity,
+              pending.candidates.contains(candidate)
+        else { return }
+        pendingAmbiguity = nil
+        submitCompiled(
+            CompiledInput.chosenCandidate(raw: pending.raw, sage: candidate),
+            advancing: pending.advances)
+    }
+
+    /// Keyboard pick while the ambiguity picker is up: Return = index 0,
+    /// digits 2–9 = indices 1–8 (matching the picker's keycap hints). An
+    /// out-of-range index does nothing — the picker stays. Returns whether a
+    /// candidate was chosen.
+    @discardableResult
+    func resolveAmbiguity(at index: Int) -> Bool {
+        guard let pending = pendingAmbiguity,
+              pending.candidates.indices.contains(index)
+        else { return false }
+        resolveAmbiguity(choosing: pending.candidates[index])
+        return true
+    }
+
+    /// Esc while the ambiguity picker is up: dismiss it, keep the draft
+    /// exactly as typed (restoring focus is the view's job). Returns whether
+    /// there was a picker to dismiss.
+    @discardableResult
+    func cancelAmbiguity() -> Bool {
+        guard pendingAmbiguity != nil else { return false }
+        pendingAmbiguity = nil
+        return true
+    }
+
+    private func submitCompiled(_ compiled: CompiledInput, advancing: Bool) {
         let rowID = append(compiled)
-        draft = ""
-        evaluate(rowID: rowID, sage: compiled.sage)
+        inputHistory.record(compiled.raw)
+        if advancing {
+            draft = ""
+        }
+        evaluate(rowID: rowID, compiled: compiled)
+    }
+
+    // MARK: - History navigation (Up/Down)
+
+    /// Up: recall the previous submitted input. Acts in single-line mode, or
+    /// at ANY time while navigation is already in progress — a recalled
+    /// multiline entry must not strand the user mid-walk. The moment the
+    /// user edits, navigation ends (`draft.didSet`) and the arrows go back
+    /// to moving the cursor. Returns whether the key was consumed.
+    func recallPreviousInput() -> Bool {
+        guard !draft.contains("\n") || inputHistory.isNavigating else { return false }
+        guard let recalled = inputHistory.recallPrevious(stashing: draft) else { return false }
+        setRecalledDraft(recalled)
+        return true
+    }
+
+    /// Down: move forward through history; past the newest entry the stashed
+    /// in-progress draft is restored. Same multiline rule as Up: it keeps
+    /// navigating while navigation is in progress. Returns whether the key
+    /// was consumed.
+    func recallNextInput() -> Bool {
+        guard !draft.contains("\n") || inputHistory.isNavigating else { return false }
+        guard let recalled = inputHistory.recallNext() else { return false }
+        setRecalledDraft(recalled)
+        return true
+    }
+
+    /// Writes a recalled entry into the draft WITHOUT counting as a user
+    /// edit (a recall must not end the navigation it's part of; it still
+    /// dismisses a pending ambiguity, since the draft text changed).
+    private func setRecalledDraft(_ text: String) {
+        isRecallingHistory = true
+        draft = text
+        isRecallingHistory = false
     }
 
     /// Evaluates a pending row in order, applies the outcome in place, and
     /// refreshes the symbol sidebar (the V0.6 op is cheap — ~1ms).
-    private func evaluate(rowID: SessionRow.ID, sage: String) {
+    ///
+    /// Prelude policy (FRIENDLY-COMPILER.md, frozen): each required variable
+    /// is declared with its own `var('V')` eval BEFORE the generated Sage —
+    /// part of what's sent, never part of what the row displays. Prelude
+    /// results are discarded (`var` over a valid identifier can't fail and
+    /// re-declaring is idempotent).
+    private func evaluate(rowID: SessionRow.ID, compiled: CompiledInput) {
         guard let controller else { return }  // pre-kernel: row stays pending
         enqueueKernelWork { [weak self] in
-            let evaluation = await controller.evaluate(sage)
+            for prelude in compiled.preludes {
+                _ = await controller.evaluate(prelude)
+            }
+            let evaluation = await controller.evaluate(compiled.sage)
             guard let self else { return }
             complete(rowID: rowID, with: evaluation)
             await refreshSymbols()
@@ -166,14 +311,15 @@ final class ShellModel {
     }
 
     /// Edits a row's input in place. Identity and timestamp are stable; the
-    /// input is recompiled and the stale result is cleared, so the row honestly
-    /// reads as not-yet-evaluated again (re-evaluation arrives with V1.3).
+    /// input is recompiled (through the real compiler) and the stale result
+    /// is cleared, so the row honestly reads as not-yet-evaluated again.
+    /// An edit that doesn't compile (error/ambiguous) leaves the row intact.
     func edit(rowID: SessionRow.ID, input: String) {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
-              let index = session.rows.firstIndex(where: { $0.id == rowID })
+              let index = session.rows.firstIndex(where: { $0.id == rowID }),
+              case let .ready(compiled) = CompiledInput.compile(trimmed)
         else { return }
-        let compiled = CompiledInput.bypass(trimmed)
         session.rows[index].input = compiled.raw
         session.rows[index].sage = compiled.sage
         session.rows[index].result = nil

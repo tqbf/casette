@@ -1,0 +1,632 @@
+// The friendly input compiler — a COMMAND SHIM, not a language.
+//
+// Input is one line. If it begins with a known command word followed by a space
+// (or is exactly a command word), we treat it as friendly and rewrite it to a
+// single Sage expression. Otherwise it BYPASSES untouched as raw Sage. We never
+// build a full math parser: expression payloads pass through structurally; we
+// tokenize only enough to find the command, the expression, and the clauses
+// (ranges `x=0..1`, `wrt x`, `->`, `order=7`, `for x`). We DO validate balanced
+// parens/brackets and emit useful, position-bearing errors.
+//
+// Pure: String in → CompileResult out. No I/O, no globals.
+
+import Foundation
+
+public enum FriendlyCompiler {
+
+    /// Compile one line of friendly/raw input.
+    public static func compile(_ rawInput: String) -> CompileResult {
+        // Normalize: strip a trailing newline and surrounding spaces. Internal
+        // spacing is preserved for the payload (we don't reflow user math).
+        let input = rawInput.replacingOccurrences(of: "\n", with: " ").trimmedShim
+
+        guard !input.isEmpty else {
+            return .bypass(rawSage: "")
+        }
+
+        // Identify a leading command word (longest match first: "double integral"
+        // before "integral" never applies, but multi-word commands are handled).
+        guard let cmd = leadingCommand(input) else {
+            // No known command word → raw Sage. Pass through untouched.
+            return .bypass(rawSage: input)
+        }
+
+        // The remainder after the command word(s).
+        let rest = String(input.dropFirst(cmd.matchedPrefix.count)).trimmedShim
+
+        // A bare command word with no argument: nothing to compile. Treat as raw
+        // (the user may have a variable named `factor`, however unlikely) — but
+        // more usefully, a structured error guides them.
+        if rest.isEmpty {
+            return .error(CompileError(
+                message: "`\(cmd.keyword.canonical)` needs an expression.",
+                position: input.utf8.count,
+                suggestion: cmd.keyword.exampleUsage
+            ))
+        }
+
+        // Balance check on the whole remainder before clause parsing, so bracket
+        // errors are reported precisely against the original input.
+        if let bal = Scanner.balanceError(in: rest) {
+            // Offset the balance position back into the full input coordinate space.
+            let base = input.utf8.count - rest.utf8.count
+            return .error(balanceCompileError(bal, baseOffset: base, input: input))
+        }
+
+        switch cmd.keyword {
+        case .factor:       return wrapCall("factor", rest)
+        case .expand:       return wrapCall("expand", rest)
+        case .simplify:     return simplify(rest)
+        case .solve:        return solve(rest)
+        case .derivative:   return derivative(rest)
+        case .integral:     return integral(rest, double: false)
+        case .doubleIntegral: return integral(rest, double: true)
+        case .limit:        return limitForm(rest)
+        case .taylor:       return taylor(rest)
+        case .plot:         return plot(rest)
+        case .matrix:       return matrixForm(rest)
+        case .eigenvalues:  return matrixMethod(rest, method: "eigenvalues")
+        case .rref:         return matrixMethod(rest, method: "rref")
+        }
+    }
+
+    // MARK: - Command keywords
+
+    enum Keyword: CaseIterable {
+        case factor, expand, simplify, solve, derivative
+        case integral, doubleIntegral, limit, taylor, plot
+        case matrix, eigenvalues, rref
+
+        /// The phrase(s) that introduce this command. Multi-word first so the
+        /// matcher prefers "double integral" over "integral".
+        var phrases: [String] {
+            switch self {
+            case .factor: return ["factor"]
+            case .expand: return ["expand"]
+            case .simplify: return ["simplify"]
+            case .solve: return ["solve"]
+            case .derivative: return ["derivative", "diff"]
+            case .integral: return ["integral", "integrate"]
+            case .doubleIntegral: return ["double integral", "double integrate"]
+            case .limit: return ["limit"]
+            case .taylor: return ["taylor"]
+            case .plot: return ["plot"]
+            case .matrix: return ["matrix"]
+            case .eigenvalues: return ["eigenvalues", "eigenvalue"]
+            case .rref: return ["rref"]
+            }
+        }
+
+        var canonical: String { phrases[0] }
+
+        var exampleUsage: String {
+            switch self {
+            case .factor: return "Try: factor x^4 - 1"
+            case .expand: return "Try: expand (x + 1)^5"
+            case .simplify: return "Try: simplify sin(x)^2 + cos(x)^2"
+            case .solve: return "Try: solve x^2 + 5*x + 6 = 0  (optionally: ... for x)"
+            case .derivative: return "Try: derivative sin(x^2)  (optionally: ... wrt x)"
+            case .integral: return "Try: integral x^2  or  integral x^2, x=0..1"
+            case .doubleIntegral: return "Try: double integral x*y, x=0..1, y=0..x"
+            case .limit: return "Try: limit sin(x)/x, x->0"
+            case .taylor: return "Try: taylor sin(x), x=0, order=7"
+            case .plot: return "Try: plot sin(x), x=-pi..pi"
+            case .matrix: return "Try: matrix [[1,2],[3,4]]"
+            case .eigenvalues: return "Try: eigenvalues [[1,2],[3,4]]"
+            case .rref: return "Try: rref [[1,2],[3,4]]"
+            }
+        }
+    }
+
+    struct CommandMatch {
+        let keyword: Keyword
+        /// The exact prefix consumed from the input (e.g. "double integral ").
+        let matchedPrefix: String
+    }
+
+    /// Find the leading command word, if any. A command is recognized only when
+    /// the input is exactly the command word, OR the command word is followed by
+    /// whitespace — so `factor x^4-1` is friendly but `factorial(5)` and
+    /// `factor(x^4-1)` (already a call) bypass.
+    static func leadingCommand(_ input: String) -> CommandMatch? {
+        let lower = input.lowercased()
+        // Collect all (keyword, phrase) candidates that match, pick the longest
+        // phrase (so "double integral" wins over "integral").
+        var best: (Keyword, String)?
+        for kw in Keyword.allCases {
+            for phrase in kw.phrases {
+                if matchesCommand(lower, phrase: phrase, original: input) {
+                    if best == nil || phrase.count > best!.1.count {
+                        best = (kw, phrase)
+                    }
+                }
+            }
+        }
+        guard let (kw, phrase) = best else { return nil }
+        // Recover the matched prefix in the original casing/length: the phrase
+        // length plus any phrase-internal spacing is fixed; we consumed exactly
+        // `phrase.count` characters (phrases are lowercase ASCII words+spaces).
+        let prefix = String(input.prefix(phrase.count))
+        return CommandMatch(keyword: kw, matchedPrefix: prefix)
+    }
+
+    private static func matchesCommand(_ lower: String, phrase: String, original: String) -> Bool {
+        guard lower.hasPrefix(phrase) else { return false }
+        // Exact match: the whole input is the command word.
+        if lower.count == phrase.count { return true }
+        // Otherwise the char right after the phrase must be whitespace, so
+        // `factor ...` matches but `factorial`/`factor(` do not.
+        let idx = original.index(original.startIndex, offsetBy: phrase.count)
+        let next = original[idx]
+        return next == " " || next == "\t"
+    }
+
+    // MARK: - Form: factor / expand (simple function wrap)
+
+    private static func wrapCall(_ fn: String, _ payload: String) -> CompileResult {
+        let expr = payload.trimmedShim
+        let sage = "\(fn)(\(expr))"
+        return .success(generatedSage: sage, requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: simplify
+
+    private static func simplify(_ payload: String) -> CompileResult {
+        // Use `.simplify_full()` so trig identities collapse (sin^2+cos^2 -> 1).
+        // Wrap the payload in parens so method binds to the whole expression.
+        let expr = payload.trimmedShim
+        let sage = "(\(expr)).simplify_full()"
+        return .success(generatedSage: sage, requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: solve
+
+    private static func solve(_ payload: String) -> CompileResult {
+        // Optional trailing "for VAR". Split that off first.
+        var body = payload
+        var forVar: String?
+        if let range = trailingClause(in: body, keyword: "for") {
+            forVar = body[range.valueRange].trimmedShim
+            body = String(body[body.startIndex..<range.clauseStart]).trimmedShim
+        }
+
+        // The body must contain an equation `LHS = RHS` (single '='), or be a bare
+        // expression (solved == 0 by convention is NOT assumed; require the '=').
+        // We translate `=` (not `==`, `<=`, `>=`, `!=`) into Sage `==`.
+        guard let eq = splitEquation(body) else {
+            return .error(CompileError(
+                message: "`solve` needs an equation with `=`.",
+                position: nil,
+                suggestion: "Try: solve x^2 + 5*x + 6 = 0  (optionally: ... for x)"
+            ))
+        }
+        let relation = "\(eq.lhs) == \(eq.rhs)"
+
+        var vars = Variables.freeVariables(in: "\(eq.lhs) \(eq.rhs)")
+        if let v = forVar, !v.isEmpty {
+            if !Variables.isPlausibleVariable(v) {
+                return .error(CompileError(
+                    message: "`for \(v)` is not a valid variable name.",
+                    position: nil,
+                    suggestion: "Try: solve x^2 + 5*x + 6 = 0 for x"
+                ))
+            }
+            // Ensure the solve var is among required (it always should be).
+            if !vars.contains(v) { vars.insert(v, at: 0) }
+            return .success(generatedSage: "solve(\(relation), \(v))", requiredVariables: vars)
+        }
+
+        // No explicit variable. If exactly one free variable, use it. If more than
+        // one, it's ambiguous which to solve for — surface candidates.
+        switch vars.count {
+        case 0:
+            // No variable at all (e.g. `solve 1 = 2`). Let Sage handle the bare
+            // relation; nothing to declare.
+            return .success(generatedSage: "solve(\(relation), [])", requiredVariables: [])
+        case 1:
+            return .success(generatedSage: "solve(\(relation), \(vars[0]))", requiredVariables: vars)
+        default:
+            let candidates = vars.map { "solve(\(relation), \($0))" }
+            return .ambiguous(candidates: candidates)
+        }
+    }
+
+    // MARK: - Form: derivative
+
+    private static func derivative(_ payload: String) -> CompileResult {
+        var body = payload
+        var wrtVar: String?
+        if let range = trailingClause(in: body, keyword: "wrt") {
+            wrtVar = body[range.valueRange].trimmedShim
+            body = String(body[body.startIndex..<range.clauseStart]).trimmedShim
+        }
+        let expr = body.trimmedShim
+        let vars = Variables.freeVariables(in: expr)
+
+        if let v = wrtVar, !v.isEmpty {
+            guard Variables.isPlausibleVariable(v) else {
+                return .error(CompileError(
+                    message: "`wrt \(v)` is not a valid variable name.",
+                    suggestion: "Try: derivative sin(x^2) wrt x"
+                ))
+            }
+            var req = vars
+            if !req.contains(v) { req.insert(v, at: 0) }
+            return .success(generatedSage: "derivative(\(expr), \(v))", requiredVariables: req)
+        }
+
+        switch vars.count {
+        case 0:
+            return .error(CompileError(
+                message: "`derivative` has no variable to differentiate by.",
+                suggestion: "Add one: derivative \(expr) wrt x"
+            ))
+        case 1:
+            return .success(generatedSage: "derivative(\(expr), \(vars[0]))", requiredVariables: vars)
+        default:
+            let candidates = vars.map { "derivative(\(expr), \($0))" }
+            return .ambiguous(candidates: candidates)
+        }
+    }
+
+    // MARK: - Form: integral / double integral
+
+    private static func integral(_ payload: String, double: Bool) -> CompileResult {
+        // Split on top-level commas: first piece = integrand, rest = ranges.
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let integrand = parts.first?.trimmedShim, !integrand.isEmpty else {
+            return .error(CompileError(
+                message: "`integral` needs an expression.",
+                suggestion: double ? "Try: double integral x*y, x=0..1, y=0..x"
+                                    : "Try: integral x^2  or  integral x^2, x=0..1"
+            ))
+        }
+        let rangeClauses = Array(parts.dropFirst())
+
+        if double {
+            // Need exactly two ranges. The reference translation binds the INNER
+            // integral to the LAST range and the outer to the FIRST:
+            //   double integral x*y, x=0..1, y=0..x
+            //     -> integrate(integrate(x*y, (y, 0, x)), (x, 0, 1))
+            guard rangeClauses.count == 2 else {
+                return .error(CompileError(
+                    message: "`double integral` needs two ranges (outer first, inner last).",
+                    suggestion: "Try: double integral x*y, x=0..1, y=0..x"
+                ))
+            }
+            guard let outer = parseRange(rangeClauses[0]) else {
+                return .error(rangeError(rangeClauses[0], example: "x=0..1"))
+            }
+            guard let inner = parseRange(rangeClauses[1]) else {
+                return .error(rangeError(rangeClauses[1], example: "y=0..x"))
+            }
+            let innerSage = "integrate(\(integrand), (\(inner.variable), \(inner.lower), \(inner.upper)))"
+            let sage = "integrate(\(innerSage), (\(outer.variable), \(outer.lower), \(outer.upper)))"
+            // Required vars: both bound vars + any free symbols in integrand/bounds.
+            var req = Variables.freeVariables(
+                in: "\(integrand) \(inner.lower) \(inner.upper) \(outer.lower) \(outer.upper)",
+                bound: [outer.variable, inner.variable]
+            )
+            // outer/inner variables guaranteed present via `bound`; keep order outer,inner.
+            req = orderedUnique([outer.variable, inner.variable] + req)
+            return .success(generatedSage: sage, requiredVariables: req)
+        }
+
+        // Single integral. Zero ranges → indefinite; one range → definite.
+        switch rangeClauses.count {
+        case 0:
+            // Indefinite: integrate(expr, var). Need the variable.
+            let vars = Variables.freeVariables(in: integrand)
+            switch vars.count {
+            case 0:
+                return .error(CompileError(
+                    message: "`integral` has no variable to integrate by.",
+                    suggestion: "Add one: integral \(integrand), x=0..1  (or give a variable)"
+                ))
+            case 1:
+                return .success(generatedSage: "integrate(\(integrand), \(vars[0]))", requiredVariables: vars)
+            default:
+                let candidates = vars.map { "integrate(\(integrand), \($0))" }
+                return .ambiguous(candidates: candidates)
+            }
+        case 1:
+            guard let r = parseRange(rangeClauses[0]) else {
+                return .error(rangeError(rangeClauses[0], example: "x=0..1"))
+            }
+            let sage = "integrate(\(integrand), (\(r.variable), \(r.lower), \(r.upper)))"
+            let req = orderedUnique([r.variable] + Variables.freeVariables(
+                in: "\(integrand) \(r.lower) \(r.upper)", bound: [r.variable]))
+            return .success(generatedSage: sage, requiredVariables: req)
+        default:
+            return .error(CompileError(
+                message: "`integral` takes at most one range (got \(rangeClauses.count)).",
+                suggestion: "For a nested integral use: double integral x*y, x=0..1, y=0..x"
+            ))
+        }
+    }
+
+    // MARK: - Form: limit
+
+    private static func limitForm(_ payload: String) -> CompileResult {
+        // `limit EXPR, VAR->VAL`. Split first top-level comma: expr, approach.
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard parts.count >= 2 else {
+            return .error(CompileError(
+                message: "`limit` needs an approach clause `var->value`.",
+                suggestion: "Try: limit sin(x)/x, x->0"
+            ))
+        }
+        let expr = parts[0].trimmedShim
+        let approach = parts[1...].joined(separator: ", ").trimmedShim
+        // Split on `->`.
+        guard let arrowRange = approach.range(of: "->") else {
+            return .error(CompileError(
+                message: "`limit` approach must use `->`, e.g. `x->0`.",
+                suggestion: "Try: limit sin(x)/x, x->0"
+            ))
+        }
+        let v = String(approach[approach.startIndex..<arrowRange.lowerBound]).trimmedShim
+        let point = String(approach[arrowRange.upperBound...]).trimmedShim
+        guard Variables.isPlausibleVariable(v) else {
+            return .error(CompileError(
+                message: "`limit` approach variable `\(v)` is not valid.",
+                suggestion: "Try: limit sin(x)/x, x->0"
+            ))
+        }
+        guard !point.isEmpty else {
+            return .error(CompileError(
+                message: "`limit` approach point is missing after `->`.",
+                suggestion: "Try: limit sin(x)/x, x->0"
+            ))
+        }
+        let sage = "limit(\(expr), \(v)=\(point))"
+        let req = orderedUnique([v] + Variables.freeVariables(in: "\(expr) \(point)", bound: [v]))
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: taylor
+
+    private static func taylor(_ payload: String) -> CompileResult {
+        // `taylor EXPR, VAR=PT, order=N`
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard parts.count >= 3 else {
+            return .error(CompileError(
+                message: "`taylor` needs an expansion point and order: `expr, var=pt, order=n`.",
+                suggestion: "Try: taylor sin(x), x=0, order=7"
+            ))
+        }
+        let expr = parts[0].trimmedShim
+        // Second clause: var=pt (an assignment, not a range — no `..`).
+        let center = parts[1].trimmedShim
+        guard let eqIdx = center.firstIndex(of: "="), !center.contains("..") else {
+            return .error(CompileError(
+                message: "`taylor` expansion point must be `var=value`.",
+                suggestion: "Try: taylor sin(x), x=0, order=7"
+            ))
+        }
+        let v = String(center[center.startIndex..<eqIdx]).trimmedShim
+        let pt = String(center[center.index(after: eqIdx)...]).trimmedShim
+        guard Variables.isPlausibleVariable(v), !pt.isEmpty else {
+            return .error(CompileError(
+                message: "`taylor` expansion point `\(center)` is malformed.",
+                suggestion: "Try: taylor sin(x), x=0, order=7"
+            ))
+        }
+        // Third clause: order=N.
+        let orderClause = parts[2].trimmedShim
+        guard let oeq = orderClause.firstIndex(of: "="),
+              orderClause[orderClause.startIndex..<oeq].trimmedShim.lowercased() == "order" else {
+            return .error(CompileError(
+                message: "`taylor` needs `order=n` as the last clause.",
+                suggestion: "Try: taylor sin(x), x=0, order=7"
+            ))
+        }
+        let order = String(orderClause[orderClause.index(after: oeq)...]).trimmedShim
+        guard !order.isEmpty, order.allSatisfy({ $0.isNumber }) else {
+            return .error(CompileError(
+                message: "`taylor` order must be a whole number (got `\(order)`).",
+                suggestion: "Try: taylor sin(x), x=0, order=7"
+            ))
+        }
+        // Sage: taylor(expr, var, pt, order).
+        let sage = "taylor(\(expr), \(v), \(pt), \(order))"
+        let req = orderedUnique([v] + Variables.freeVariables(in: "\(expr) \(pt)", bound: [v]))
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: plot
+
+    private static func plot(_ payload: String) -> CompileResult {
+        // `plot EXPR, VAR=A..B`
+        let parts = Scanner.splitTopLevelCommas(payload)
+        let expr = parts.first?.trimmedShim ?? ""
+        guard !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`plot` needs an expression.",
+                suggestion: "Try: plot sin(x), x=-pi..pi"
+            ))
+        }
+        guard parts.count >= 2 else {
+            return .error(CompileError(
+                message: "`plot` needs a range `var=a..b`.",
+                suggestion: "Try: plot sin(x), x=-pi..pi"
+            ))
+        }
+        guard let r = parseRange(parts[1]) else {
+            return .error(rangeError(parts[1], example: "x=-pi..pi"))
+        }
+        let sage = "plot(\(expr), (\(r.variable), \(r.lower), \(r.upper)))"
+        let req = orderedUnique([r.variable] + Variables.freeVariables(
+            in: "\(expr) \(r.lower) \(r.upper)", bound: [r.variable]))
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: matrix / eigenvalues / rref
+
+    private static func matrixForm(_ payload: String) -> CompileResult {
+        let body = payload.trimmedShim
+        guard body.hasPrefix("[") else {
+            return .error(CompileError(
+                message: "`matrix` needs a bracketed list of rows.",
+                suggestion: "Try: matrix [[1,2],[3,4]]"
+            ))
+        }
+        return .success(generatedSage: "matrix(\(body))", requiredVariables: [])
+    }
+
+    private static func matrixMethod(_ payload: String, method: String) -> CompileResult {
+        let body = payload.trimmedShim
+        guard body.hasPrefix("[") else {
+            return .error(CompileError(
+                message: "`\(method)` needs a bracketed list of rows.",
+                suggestion: "Try: \(method) [[1,2],[3,4]]"
+            ))
+        }
+        return .success(generatedSage: "matrix(\(body)).\(method)()", requiredVariables: [])
+    }
+
+    // MARK: - Range / clause parsing helpers
+
+    struct Range {
+        let variable: String
+        let lower: String
+        let upper: String
+    }
+
+    /// Parse `var=lower..upper`. Returns nil if malformed (missing `=`, missing
+    /// `..`, empty bound, etc.) so the caller can emit a precise error.
+    static func parseRange(_ clause: String) -> Range? {
+        let c = clause.trimmedShim
+        guard let eqIdx = c.firstIndex(of: "=") else { return nil }
+        let v = String(c[c.startIndex..<eqIdx]).trimmedShim
+        let rangePart = String(c[c.index(after: eqIdx)...]).trimmedShim
+        guard Variables.isPlausibleVariable(v) else { return nil }
+        guard let dotRange = rangePart.range(of: "..") else { return nil }
+        let lower = String(rangePart[rangePart.startIndex..<dotRange.lowerBound]).trimmedShim
+        let upper = String(rangePart[dotRange.upperBound...]).trimmedShim
+        guard !lower.isEmpty, !upper.isEmpty else { return nil }
+        return Range(variable: v, lower: lower, upper: upper)
+    }
+
+    private static func rangeError(_ clause: String, example: String) -> CompileError {
+        let c = clause.trimmedShim
+        if c.contains("..") && c.hasSuffix("..") {
+            return CompileError(
+                message: "Range `\(c)` is incomplete — missing the upper bound after `..`.",
+                suggestion: "Complete it, e.g. `\(example)`."
+            )
+        }
+        if !c.contains("..") {
+            return CompileError(
+                message: "Range `\(c)` is missing `..` between the bounds.",
+                suggestion: "Use `var=lo..hi`, e.g. `\(example)`."
+            )
+        }
+        return CompileError(
+            message: "Range `\(c)` is malformed.",
+            suggestion: "Use `var=lo..hi`, e.g. `\(example)`."
+        )
+    }
+
+    /// A trailing keyword-introduced clause like `for x` / `wrt x`: returns the
+    /// range of the clause start (so the body can be trimmed) and the value range.
+    struct TrailingClause {
+        let clauseStart: String.Index
+        let valueRange: Swift.Range<String.Index>
+    }
+
+    /// Find a trailing ` KEYWORD value` clause (space-delimited keyword). The
+    /// keyword must appear at top level (not nested) and be followed by a value.
+    static func trailingClause(in s: String, keyword: String) -> TrailingClause? {
+        // Search for " keyword " (case-insensitive) as a whole word near the end.
+        let lower = s.lowercased()
+        let needle = " \(keyword) "
+        // Find the LAST occurrence so `for x` at the very end is matched.
+        guard let r = lower.range(of: needle, options: .backwards) else {
+            // Also allow keyword at exact end with no trailing space? No — needs a value.
+            return nil
+        }
+        // Map back into `s` (same indices: lowercasing ASCII keeps length here for
+        // our inputs; to be safe, compute offset).
+        let startOffset = lower.distance(from: lower.startIndex, to: r.lowerBound)
+        let endOffset = lower.distance(from: lower.startIndex, to: r.upperBound)
+        let clauseStart = s.index(s.startIndex, offsetBy: startOffset)
+        let valueStart = s.index(s.startIndex, offsetBy: endOffset)
+        let value = String(s[valueStart...]).trimmedShim
+        guard !value.isEmpty else { return nil }
+        return TrailingClause(clauseStart: clauseStart, valueRange: valueStart..<s.endIndex)
+    }
+
+    // MARK: - Equation split
+
+    struct Equation { let lhs: String; let rhs: String }
+
+    /// Split `LHS = RHS` on a single top-level `=` that is NOT part of
+    /// `==`, `<=`, `>=`, `!=`. Returns nil if there is no such `=`.
+    static func splitEquation(_ s: String) -> Equation? {
+        let chars = Array(s)
+        var depth = 0
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            switch ch {
+            case "(", "[", "{": depth += 1
+            case ")", "]", "}": depth -= 1
+            case "=" where depth == 0:
+                let prev = i > 0 ? chars[i - 1] : " "
+                let next = i + 1 < chars.count ? chars[i + 1] : " "
+                // Skip ==, <=, >=, !=
+                if next == "=" { i += 2; continue }
+                if prev == "=" || prev == "<" || prev == ">" || prev == "!" {
+                    i += 1; continue
+                }
+                let lhs = String(chars[0..<i]).trimmedShim
+                let rhs = String(chars[(i + 1)...]).trimmedShim
+                guard !lhs.isEmpty, !rhs.isEmpty else { return nil }
+                return Equation(lhs: lhs, rhs: rhs)
+            default: break
+            }
+            i += 1
+        }
+        return nil
+    }
+
+    // MARK: - Balance error → CompileError
+
+    private static func balanceCompileError(_ bal: Scanner.BalanceError, baseOffset: Int, input: String) -> CompileError {
+        let pos = baseOffset + bal.position
+        switch bal.kind {
+        case let .unclosed(ch):
+            let close = ch == "(" ? ")" : ch == "[" ? "]" : "}"
+            return CompileError(
+                message: "Unbalanced `\(ch)` — it is never closed.",
+                position: pos,
+                suggestion: "Add a matching `\(close)`."
+            )
+        case let .unexpectedClose(ch):
+            return CompileError(
+                message: "Unexpected `\(ch)` — there is no matching opener.",
+                position: pos,
+                suggestion: "Remove it or add the missing opener."
+            )
+        case let .mismatched(open, close):
+            let want = open == "(" ? ")" : open == "[" ? "]" : "}"
+            return CompileError(
+                message: "Bracket mismatch — `\(open)` is closed by `\(close)`.",
+                position: pos,
+                suggestion: "Close it with `\(want)` instead."
+            )
+        }
+    }
+
+    // MARK: - Small utilities
+
+    private static func orderedUnique(_ items: [String]) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for i in items where !i.isEmpty {
+            if !seen.contains(i) { seen.insert(i); out.append(i) }
+        }
+        return out
+    }
+}

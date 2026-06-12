@@ -34,6 +34,29 @@ enum Theme {
     static let inputPaddingHorizontal: CGFloat = 16
     static let inputPaddingVertical: CGFloat = 12
     static let inputElementSpacing: CGFloat = 8
+    /// Vertical gap between the input field and the compile-preview line.
+    static let inputPreviewSpacing: CGFloat = 4
+    /// The expanding editor's height ceiling (~6 input lines); content
+    /// beyond it scrolls inside the editor.
+    static let inputMaxHeight: CGFloat = 140
+    /// The editor's internal text insets (mirrored by the sizing text so the
+    /// field grows exactly with its content).
+    static let inputEditorInsetVertical: CGFloat = 4
+    static let inputEditorInsetHorizontal: CGFloat = 5
+    /// Reserved height of the compile-preview line (stable while typing).
+    static let inputPreviewMinHeight: CGFloat = 16
+    /// Optical alignment of the pane's accessories (chevron, hints, status)
+    /// against the editor's first text line.
+    static let inputAccessoryTopPadding: CGFloat = 6
+
+    // MARK: Ambiguity panel (the inline suggestion panel above the input)
+    /// Gap between the panel's bottom edge and the input pane's top edge.
+    static let ambiguityPanelGap: CGFloat = 6
+    static let ambiguityPanelCornerRadius: CGFloat = 10
+    static let ambiguityPanelPadding: CGFloat = 6
+    static let ambiguityRowCornerRadius: CGFloat = 6
+    static let ambiguityRowPaddingHorizontal: CGFloat = 8
+    static let ambiguityRowPaddingVertical: CGFloat = 5
 
     // MARK: Sidebar content
     static let sidebarSectionPadding: CGFloat = 10
@@ -69,5 +92,15 @@ enum Theme {
         static let symbolKind = Font.caption
         /// The bottom input field — prominent, calculator-like.
         static let input = Font.title3.monospaced()
+        /// The live generated-Sage preview under the input — Sage text in a
+        /// chrome context, one scale below the field (callout + mono, the
+        /// same voice as `sidebarMono`).
+        static let inputPreviewSage = Font.callout.monospaced()
+        /// Inline compile-issue prose under the input (metadata scale,
+        /// default face — it's guidance, not math).
+        static let inputPreviewIssue = Font.caption
+        /// The `Try: …` suggestion inside a compile issue — example input,
+        /// so it keeps the mono voice at the metadata scale.
+        static let inputPreviewSuggestion = Font.caption.monospaced()
     }
 }

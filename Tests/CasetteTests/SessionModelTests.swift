@@ -191,17 +191,8 @@ struct SessionModelTests {
     }
 }
 
-@Suite("CompiledInput")
-struct CompiledInputTests {
-    @Test("bypass passes raw Sage through untouched")
-    func bypassIsUntouched() {
-        let compiled = CompiledInput.bypass("factor(x^4 - 1)")
-        #expect(compiled.raw == "factor(x^4 - 1)")
-        #expect(compiled.sage == "factor(x^4 - 1)")
-        #expect(compiled.requiredVariables.isEmpty)
-        #expect(compiled.origin == .bypass)
-    }
-}
+// The V1.2 CompiledInput suite moved to CompiledInputTests.swift, where the
+// V1.4 compile boundary (compiler outcomes, prelude policy) is tested too.
 
 @Suite("KernelState")
 struct KernelStateTests {

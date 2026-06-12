@@ -11,6 +11,17 @@ struct SageCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Sage") {
+            // ⌘↩ — evaluate the input WITHOUT advancing (the draft stays in
+            // place for iteration). On the menu so it's discoverable; as a
+            // key equivalent it works while the input field has focus.
+            Button("Evaluate Without Advancing") {
+                model?.evaluateInPlace()
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(model == nil)
+
+            Divider()
+
             Button("Interrupt Evaluation") {
                 model?.interruptEvaluation()
             }

@@ -14,8 +14,9 @@ struct ShellModelTests {
 
         #expect(model.rows.count == 1)
         #expect(model.rows[0].input == "factor x^4 - 1")
-        // No compiler until V1.4: the input bypasses as raw Sage.
-        #expect(model.rows[0].sage == "factor x^4 - 1")
+        // V1.4: the friendly compiler is wired in — the row records the
+        // raw input AND the generated Sage.
+        #expect(model.rows[0].sage == "factor(x^4 - 1)")
         // No kernel until V1.3: the row is honestly incomplete — no result.
         #expect(model.rows[0].status == .running)
         #expect(model.rows[0].result == nil)

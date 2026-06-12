@@ -56,6 +56,43 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.4 done (live gate PASSED, rounds 4+5 combined) — the input pane is a calculator
+and the friendly compiler is wired in.** `FriendlyCompiler` is lifted from
+v0/07 as a second SwiftPM library target (`Sources/FriendlyCompiler/`,
+library + 69-test suite **byte-identical** to the frozen proof; the one
+app-side addition is a public free-variable accessor for ambiguity
+candidates). `CompiledInput.compile` is the boundary: `.success` → friendly
+row (raw input + generated Sage split), `.bypass` → raw Sage untouched,
+`.error` → inline message+suggestion under the field (NO row, draft kept),
+`.ambiguous` → an inline candidate panel floated above the input pane
+(Return/digits choose, Esc keeps editing). **Multiline input bypasses BEFORE the compiler** (the V0.7
+normalizer flattens newlines — new PROBLEMS.md entry). Prelude policy per
+FRIENDLY-COMPILER.md: one `var('V')` eval per required variable sent ahead
+of the generated Sage on the serial kernel queue; preludes are sent, never
+shown — `SessionRow.sage` stays the clean expression. Keyboard: **Return**
+evaluate · **⇧⏎** newline at the cursor (the field is a TextEditor +
+sizing-mirror, single-line by default, growing to ~6 lines then scrolling) ·
+**⌘⏎** evaluate without advancing (also on the Sage menu) · **Up/Down**
+session history with draft preservation (single-line mode). A live
+generated-Sage preview line sits under the field (recompiled per keystroke —
+the compiler is pure and fast). `make check` / `make test` (**163/163** =
+94 app + 69 lifted, incl. 5 real-Sage friendly-pipeline journeys: factor,
+double integral → 1/8, prelude-proving `integral t^2`, ambiguous solve,
+error-never-submits) / `make build` green; full V0 regression re-run clean;
+launch/quit clean, `pgrep` clean. Verifier checklist in PROGRESS.md.
+**Two fix rounds after on-screen verification:** round 1 moved the
+ambiguity keys (Esc/Return/digits) onto testable model methods called from
+the focused `InputEditor`, made any user edit dismiss the picker AND reset
+the history cursor to newest (`draft.didSet`), and let Up/Down keep
+navigating across recalled multiline entries. Round 2 re-architected the
+presentation: a macOS `.popover` is its OWN KEY WINDOW — the editor loses
+first responder and NO key routing works on either side (rewritten
+PROBLEMS.md lesson) — so the picker is now an inline same-window overlay
+floated above the input pane (`InputPaneView.overlay` +
+`AmbiguityPickerView` as a material suggestion panel; plain buttons for the
+mouse, the still-focused editor for every key). Tests **172/172**; round-2
+checklist in PROGRESS.md. **Next: V1.5 — result rendering v1.**
+
 **V1.3 done (live gate PASSED on screen, all 12 checks) — the app talks to
 Sage.** `SageKernel` (Sources/Casette/Kernel/) unifies v0/09's
 `WorkerProcess`+`LineReader`: `posix_spawn` + `SETSID` **+
