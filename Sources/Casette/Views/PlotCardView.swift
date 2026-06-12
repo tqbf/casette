@@ -9,6 +9,7 @@ struct PlotCardView: View {
     let result: PersistedEnvelope
     /// The row's input echo, for the zoom sheet's header.
     let title: String
+    let canRerun: Bool
     let onRerun: () -> Void
 
     @State private var zoomed: PlotZoomItem?
@@ -19,6 +20,7 @@ struct PlotCardView: View {
             ForEach(renditions) { rendition in
                 PlotImageWell(
                     rendition: rendition,
+                    canRerun: canRerun,
                     onRerun: onRerun,
                     onZoom: { zoomed = $0 },
                     title: title)
@@ -26,7 +28,7 @@ struct PlotCardView: View {
             if renditions.isEmpty && !result.artifacts.isEmpty {
                 // Artifacts exist but none is a renderable PNG (e.g. only an
                 // SVG survived a save failure) — one honest missing state.
-                PlotMissingView(saveError: pngSaveError, onRerun: onRerun)
+                PlotMissingView(saveError: pngSaveError, canRerun: canRerun, onRerun: onRerun)
             }
             Text(result.plain)
                 .font(Theme.Fonts.meta)
@@ -62,6 +64,7 @@ struct PlotCardView: View {
                         bytes: 18896, status: .missing),
                 ]),
             title: "plot sin(x), x=-pi..pi",
+            canRerun: true,
             onRerun: {})
         PlotCardView(
             result: PersistedEnvelope(
@@ -74,6 +77,7 @@ struct PlotCardView: View {
                         error: "OSError: [Errno 28] No space left on device"),
                 ]),
             title: "plot cos(x), x=-pi..pi",
+            canRerun: true,
             onRerun: {})
     }
     .padding()

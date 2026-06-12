@@ -24,6 +24,7 @@ struct SessionTapeView: View {
                                 isSelected: model.selectedRowID == row.id,
                                 isKernelConnected: model.kernelState.isConnected,
                                 provenanceMark: model.provenanceMark(for: row),
+                                isLiveInKernel: model.rowIsLiveInKernel(row),
                                 onSelect: { model.select(row.id) },
                                 onToggleExpanded: { model.toggleExpanded(rowID: row.id) },
                                 onRerun: { model.rerun(rowID: row.id) },

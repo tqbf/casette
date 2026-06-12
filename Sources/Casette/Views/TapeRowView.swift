@@ -16,6 +16,9 @@ struct TapeRowView: View {
     /// shown) for the normal fresh row. Derived by the model — see
     /// `RowProvenanceMark`.
     var provenanceMark: RowProvenanceMark?
+    /// False for cached restored rows whose result is visible on the tape but
+    /// not present in the current Sage namespace.
+    let isLiveInKernel: Bool
     let onSelect: () -> Void
     let onToggleExpanded: () -> Void
     /// Re-evaluates this row's input as a fresh tape row (the plot card's
@@ -76,13 +79,19 @@ struct TapeRowView: View {
                     .font(Theme.Fonts.meta)
                     .foregroundStyle(.tertiary)
             }
-            TapeRowResultView(row: row, isKernelConnected: isKernelConnected, onRerun: onRerun)
+            TapeRowResultView(
+                row: row,
+                isKernelConnected: isKernelConnected,
+                canRunRowActions: isLiveInKernel,
+                onRerun: onRerun
+            )
             // Structural conditional with NO transition (§1.1) — same
             // precedent as the kernel banner and the ambiguity panel.
             if row.expanded {
                 TapeRowExpandedView(row: row)
             }
         }
+        .opacity(isLiveInKernel ? 1 : 0.58)
         .padding(.horizontal, Theme.rowPaddingHorizontal)
         .padding(.vertical, Theme.rowPaddingVertical)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,6 +126,8 @@ struct TapeRowView: View {
             if row.approximateCommand != nil {
                 Divider()
                 Button("Approximate Numerically", action: onApproximate)
+                    .disabled(!isLiveInKernel)
+                    .help(isLiveInKernel ? "Evaluate a numeric approximation" : detachedHelp)
             }
         }
     }
@@ -130,6 +141,10 @@ struct TapeRowView: View {
             Pasteboard.copy(row.input)
         }
     }
+
+    private var detachedHelp: String {
+        "Replay the session before running actions from restored rows."
+    }
 }
 
 #Preview {
@@ -137,6 +152,7 @@ struct TapeRowView: View {
         ForEach(PlaceholderData.rows.prefix(4)) { row in
             TapeRowView(
                 row: row, isSelected: false, isKernelConnected: false,
+                isLiveInKernel: true,
                 onSelect: {}, onToggleExpanded: {}, onRerun: {}, onApproximate: {}
             )
         }

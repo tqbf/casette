@@ -17,6 +17,7 @@ struct HistoryTabView: View {
             List(model.historyRows) { row in
                 HistoryRowView(
                     row: row,
+                    canRerun: model.rowIsLiveInKernel(row),
                     onInsert: { insert(row) },
                     onRerun: { model.rerun(rowID: row.id) }
                 )

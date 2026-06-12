@@ -28,6 +28,23 @@ private final class FactoryRecorder: @unchecked Sendable {
     }
 }
 
+private final class EvalLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func record(_ value: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        stored.append(value)
+    }
+}
+
 /// V1.9 end-to-end over fakes: incremental atomic saves after every row,
 /// restore (with and without Sage), crash recovery, replay (order, preludes,
 /// numeric honor, supersede), schema refusal, and the provenance marks.
@@ -230,6 +247,47 @@ struct SessionPersistenceFlowTests {
         model.edit(rowID: restoredID, input: "9 * 9")
         let edited = model.rows.first { $0.id == restoredID }!
         #expect(model.provenanceMark(for: edited) == nil)
+    }
+
+    @Test("restored cached rows are visible but not live command sources until replayed")
+    func cachedRowsAreNotLiveCommandSourcesUntilReplay() async throws {
+        let store = makeScratchStore()
+        defer { removeScratch(store) }
+        try store.save(fixtureSession())
+
+        let order = EvalLog()
+        let fake = FakeKernelTransport()
+        fake.respondToSend = { request in
+            guard let id = request["id"] as? String else { return [] }
+            if request["op"] as? String == "symbols" {
+                return [WireFixtures.symbolsResponse(id: id, entries: [])]
+            }
+            order.record(request["code"] as? String ?? "?")
+            return [WireFixtures.okEnvelope(id: id, plain: "4", kind: "integer")]
+        }
+
+        let model = ShellModel()
+        model.restoreLastSession(from: store)
+        model.connectKernel(SessionController(configuration: Self.fastConfig()) { fake })
+        #expect(await eventually { @MainActor in model.kernelState.isConnected })
+
+        let restoredID = model.rows[0].id
+        #expect(model.provenanceMark(for: model.rows[0]) == .cached)
+        #expect(!model.rowIsLiveInKernel(model.rows[0]))
+
+        model.rerun(rowID: restoredID)
+        model.approximateNumerically(rowID: restoredID)
+        model.evaluateActionCommand("(x^2 + 1).factor()", sourceRowID: restoredID)
+
+        #expect(model.rows.count == 4)
+        #expect(order.values == [ShellModel.bootPrelude])
+
+        model.replaySession()
+        #expect(await eventually { @MainActor in
+            !model.isReplaying && model.rows.allSatisfy { $0.provenance.kind == .replayed }
+        })
+        #expect(model.provenanceMark(for: model.rows[0]) == .replayed)
+        #expect(model.rowIsLiveInKernel(model.rows[0]))
     }
 
     // MARK: Replay
