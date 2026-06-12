@@ -1,4 +1,5 @@
 import Foundation
+import FriendlyCompiler
 import Testing
 @testable import Casette
 
@@ -287,6 +288,25 @@ struct ShellModelInputTests {
             Issue.record("expected .issue for unbalanced bracket")
             return
         }
+    }
+
+    @Test("integral formula bar model rewrites friendly IR")
+    func integralFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "integral #14 + x^2"
+        guard var formula = model.integralFormula else {
+            Issue.record("expected integral formula")
+            return
+        }
+        #expect(formula.expression == "#14 + x^2")
+        #expect(formula.variable == "x")
+
+        formula.lowerBound = "0"
+        formula.upperBound = "1"
+        model.updateIntegralFormula(formula)
+        #expect(model.draft == "integral #14 + x^2, x=0..1")
+        #expect(model.integralFormula?.lowerBound == "0")
+        #expect(model.integralFormula?.upperBound == "1")
     }
 
     @Test("tape references use visible row numbers but only successful reusable rows are valid")

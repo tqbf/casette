@@ -8,6 +8,20 @@ Current gates are green: `swift test` (**302/302**, 47 suites) passed for the la
 
 **Latest maintenance:** Tape entries are now visibly numbered, and prompts can reuse the last 20 successful reusable tape expressions with `#ROW` syntax. Errors still occupy row numbers but are not valid references; missing/stale references surface as normal compile-preview errors. `#57` expands before friendly compilation to the private Sage dictionary lookup `__casette_tape_refs[57]`, and the worker dictionary is refreshed after successful evals and during Replay Session so restored sessions can rebuild reference state. The private dictionary is filtered out of the Symbols sidebar because it is app plumbing, not user-serviceable state. The app's default approximation precision is now 5 digits (configured at boot over the worker's native 10), and the precision menu includes 2- and 3-digit choices. Tests cover reference expansion, missing references, error-skipping with visible row numbers, the 20-entry window, replay rebuild, symbol filtering, default precision, and existing numeric/queue semantics; `swift test` is green at **302/302**.
 
+**Formula autocomplete prototype:** The input pane now grows a compact
+Numbers-style formula bar when the draft starts with `integral`/`integrate`.
+The bar edits expression, variable, and the two optional definite bounds while
+rewriting the source draft back to friendly input, not Sage. The shared IR is
+`IntegralFormulaIR` in `FriendlyCompiler`; it preserves app-level source such
+as `#14` tape references until `CompiledInput` expands them at the existing
+compile boundary. The friendly compiler also accepts explicit indefinite
+integrals as `integral expr, wrt var`. Focused tests cover `wrt`, IR rendering,
+`#ROW` preservation/expansion, and model draft rewrites. `swift test` is green
+at **305/305** and `make build` is green. The function chip is pinned outside
+the argument lane, and the formula expansion now sits on its own full-width
+lane below the input controls so the optional bounds are visible without
+horizontal scrolling at the normal window size.
+
 **Previous maintenance:** Restored tape rows now read as **not live** until Replay Session recomputes them into the current Sage namespace. The tape still restores render-ready from disk, but cached rows are visually deemphasized and row-derived execution affordances (History rerun, plot regenerate, Approximate Numerically, and Actions-tab command buttons) are disabled/guarded so users do not fire commands against variables that are only present in the old persisted transcript. Replayed rows become live again and regain the normal affordances. A focused persistence test covers the stale-row guard; `make check`, `make test` (**298/298**), and `make build` are green.
 
 **Current phase:** V1.10 complete — Sage Doctor in app. **Next:** V1.11 — Result Actions, starting by reconciling the existing V1.6 Actions-tab implementation with `plans/INITIAL.md`.

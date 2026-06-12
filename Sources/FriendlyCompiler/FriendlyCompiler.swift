@@ -279,6 +279,14 @@ public enum FriendlyCompiler {
     // MARK: - Form: integral / double integral
 
     private static func integral(_ payload: String, double: Bool) -> CompileResult {
+        var payload = payload
+        var wrtVar: String?
+        if let wrt = trailingClause(in: payload, keyword: "wrt") {
+            wrtVar = payload[wrt.valueRange].trimmedShim
+            payload = String(payload[payload.startIndex..<wrt.clauseStart])
+                .droppingIntegralTrailingComma
+                .trimmedShim
+        }
         // Split on top-level commas: first piece = integrand, rest = ranges.
         let parts = Scanner.splitTopLevelCommas(payload)
         guard let integrand = parts.first?.trimmedShim, !integrand.isEmpty else {
@@ -324,6 +332,17 @@ public enum FriendlyCompiler {
         case 0:
             // Indefinite: integrate(expr, var). Need the variable.
             let vars = Variables.freeVariables(in: integrand)
+            if let wrtVar, !wrtVar.isEmpty {
+                guard Variables.isPlausibleVariable(wrtVar) else {
+                    return .error(CompileError(
+                        message: "`wrt \(wrtVar)` is not a valid variable name.",
+                        suggestion: "Try: integral \(integrand), wrt x"
+                    ))
+                }
+                return .success(
+                    generatedSage: "integrate(\(integrand), \(wrtVar))",
+                    requiredVariables: orderedUnique([wrtVar] + vars))
+            }
             switch vars.count {
             case 0:
                 return .error(CompileError(
@@ -732,5 +751,13 @@ public enum FriendlyCompiler {
     private static func utf8Offset(of needle: String, in haystack: String) -> Int {
         guard let range = haystack.range(of: needle, options: .backwards) else { return 0 }
         return haystack[haystack.startIndex..<range.lowerBound].utf8.count
+    }
+}
+
+extension String {
+    fileprivate var droppingIntegralTrailingComma: String {
+        let trimmed = trimmedShim
+        guard trimmed.last == "," else { return trimmed }
+        return String(trimmed.dropLast())
     }
 }

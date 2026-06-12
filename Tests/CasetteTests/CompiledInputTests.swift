@@ -1,4 +1,5 @@
 import Foundation
+import FriendlyCompiler
 import Testing
 @testable import Casette
 
@@ -127,6 +128,31 @@ struct CompiledInputTests {
         #expect(compiled.sage == "expand(__casette_tape_refs[57])")
         #expect(compiled.origin == .friendly)
         #expect(compiled.preludes.isEmpty)
+    }
+
+    @Test("integral formula IR preserves tape references until the app compile boundary")
+    func integralFormulaIRPreservesTapeReferences() {
+        var ir = IntegralFormulaIR(
+            expression: "#14 + x^2",
+            variable: "x",
+            lowerBound: "0",
+            upperBound: "1",
+            hasExplicitVariable: true)
+        #expect(ir.friendlyInput == "integral #14 + x^2, x=0..1")
+
+        ir.upperBound = nil
+        #expect(ir.friendlyInput == "integral #14 + x^2, x=0..")
+
+        let references = TapeReferenceTable(entries: [14: "sin(x)"])
+        guard case let .ready(compiled) = CompiledInput.compile(
+            "integral #14 + x^2, x=0..1",
+            tapeReferences: references
+        ) else {
+            Issue.record("expected formula IR to compile after tape-reference expansion")
+            return
+        }
+        #expect(compiled.raw == "integral #14 + x^2, x=0..1")
+        #expect(compiled.sage == "integrate(__casette_tape_refs[14] + x^2, (x, 0, 1))")
     }
 
     @Test("missing tape references are compile errors")

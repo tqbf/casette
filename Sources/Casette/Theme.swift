@@ -93,6 +93,12 @@ enum Theme {
     /// toggle + precision menu) — controls carry their own chrome height,
     /// so they sit a touch higher than bare-text accessories.
     static let inputControlTopPadding: CGFloat = 2
+    /// Leading inset for formula and preview lanes so they line up with the
+    /// editor text after the prompt chevron.
+    static let inputFormulaLeadingInset: CGFloat = 24
+
+    // MARK: Formula autocomplete bar
+    static let formulaTokenCornerRadius: CGFloat = 7
 
     // MARK: Ambiguity panel (the inline suggestion panel above the input)
     /// Gap between the panel's bottom edge and the input pane's top edge.
@@ -160,5 +166,13 @@ enum Theme {
         /// The `Try: …` suggestion inside a compile issue — example input,
         /// so it keeps the mono voice at the metadata scale.
         static let inputPreviewSuggestion = Font.caption.monospaced()
+        /// Formula function token, like Numbers' function dropdown.
+        static let formulaFunction = Font.callout.weight(.semibold)
+        /// Formula argument labels are chrome, not content.
+        static let formulaTokenLabel = Font.caption.weight(.medium)
+        /// Formula argument values are editable math/source fragments.
+        static let formulaTokenValue = Font.callout.monospaced()
+        /// Formula punctuation between tokens.
+        static let formulaPunctuation = Font.callout.weight(.semibold).monospaced()
     }
 }

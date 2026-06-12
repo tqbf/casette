@@ -20,30 +20,39 @@ struct InputPaneView: View {
     var isFocused: FocusState<Bool>.Binding
 
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.inputElementSpacing) {
-            Image(systemName: "chevron.right")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.top, Theme.inputAccessoryTopPadding)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Theme.inputPreviewSpacing) {
+        VStack(alignment: .leading, spacing: Theme.inputPreviewSpacing) {
+            HStack(alignment: .top, spacing: Theme.inputElementSpacing) {
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, Theme.inputAccessoryTopPadding)
+                    .accessibilityHidden(true)
                 InputEditor(model: model, isFocused: isFocused)
-                DraftPreviewLine(preview: model.draftPreview)
+                    .frame(maxWidth: .infinity)
+                // Always mounted, opacity-faded (never insert/remove — §1.1).
+                Text("⏎ evaluate   ⇧⏎ newline")
+                    .font(Theme.Fonts.meta)
+                    .foregroundStyle(.tertiary)
+                    .opacity(model.draft.isEmpty ? 0 : 1)
+                    .animation(.easeOut(duration: 0.15), value: model.draft.isEmpty)
+                    .padding(.top, Theme.inputAccessoryTopPadding)
+                    .accessibilityHidden(true)
+                // The V1.8 exact/numeric controls: session-scoped, so they
+                // live with the input (next to the kernel status), not in
+                // Settings.
+                ExactnessControls(model: model)
+                    .padding(.top, Theme.inputControlTopPadding)
+                KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
+                    .padding(.top, Theme.inputAccessoryTopPadding)
             }
-            // Always mounted, opacity-faded (never insert/remove — §1.1).
-            Text("⏎ evaluate   ⇧⏎ newline")
-                .font(Theme.Fonts.meta)
-                .foregroundStyle(.tertiary)
-                .opacity(model.draft.isEmpty ? 0 : 1)
-                .animation(.easeOut(duration: 0.15), value: model.draft.isEmpty)
-                .padding(.top, Theme.inputAccessoryTopPadding)
-                .accessibilityHidden(true)
-            // The V1.8 exact/numeric controls: session-scoped, so they live
-            // with the input (next to the kernel status), not in Settings.
-            ExactnessControls(model: model)
-                .padding(.top, Theme.inputControlTopPadding)
-            KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
-                .padding(.top, Theme.inputAccessoryTopPadding)
+            if let formula = model.integralFormula {
+                IntegralFormulaBar(model: model, formula: formula)
+                    .padding(.leading, Theme.inputFormulaLeadingInset)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            DraftPreviewLine(preview: model.draftPreview)
+                .padding(.leading, Theme.inputFormulaLeadingInset)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, Theme.inputPaddingHorizontal)
         .padding(.vertical, Theme.inputPaddingVertical)

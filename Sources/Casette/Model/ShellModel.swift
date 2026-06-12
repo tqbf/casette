@@ -1,4 +1,5 @@
 import Foundation
+import FriendlyCompiler
 import Observation
 import os
 
@@ -471,6 +472,19 @@ final class ShellModel {
         case let .ambiguous(candidates):
             return .ambiguous(count: candidates.count)
         }
+    }
+
+    /// The formula-bar IR for drafts that begin with the integral command.
+    /// It renders back to friendly input, so `#14` tape references and other
+    /// app-side source forms stay untouched until `CompiledInput.compile`.
+    var integralFormula: IntegralFormulaIR? {
+        IntegralFormulaIR.parse(draft)
+    }
+
+    func updateIntegralFormula(_ formula: IntegralFormulaIR) {
+        let newDraft = formula.friendlyInput
+        guard draft != newDraft else { return }
+        draft = newDraft
     }
 
     /// Return: compile and evaluate, advancing (the draft clears).

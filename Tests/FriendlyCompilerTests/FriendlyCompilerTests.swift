@@ -59,6 +59,7 @@ struct SpecForms {
     @Test func derivative() { expectSuccess("derivative sin(x^2)", "derivative(sin(x^2), x)") }
     @Test func derivativeWrt() { expectSuccess("derivative sin(x^2) wrt x", "derivative(sin(x^2), x)") }
     @Test func integralIndefinite() { expectSuccess("integral x^2", "integrate(x^2, x)") }
+    @Test func integralIndefiniteWrt() { expectSuccess("integral x*y, wrt y", "integrate(x*y, y)") }
     @Test func integralDefinite() { expectSuccess("integral x^2, x=0..1", "integrate(x^2, (x, 0, 1))") }
     @Test func doubleIntegral() {
         expectSuccess("double integral x*y, x=0..1, y=0..x",
