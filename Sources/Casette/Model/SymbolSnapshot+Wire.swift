@@ -17,6 +17,7 @@ extension SymbolSnapshot {
         else { return nil }
         let entries = list.compactMap { entry -> SymbolEntry? in
             guard let name = entry["name"] as? String else { return nil }
+            guard name != TapeReferenceTable.variableName else { return nil }
             return SymbolEntry(
                 name: name,
                 kind: entry["kind"] as? String ?? "",

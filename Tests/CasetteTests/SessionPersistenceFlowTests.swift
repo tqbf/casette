@@ -381,7 +381,7 @@ struct SessionPersistenceFlowTests {
         #expect(recorder.calls == 2)
         let replayWire = recorder.fakes[1].sentObjects
         let codes = replayWire.compactMap { $0["code"] as? String }
-        #expect(codes == [
+        #expect(codes.filter { !$0.contains("__casette_tape_refs") } == [
             ShellModel.bootPrelude,
             "A = matrix([[1,2],[3,4]])",
             "A.eigenvalues()",

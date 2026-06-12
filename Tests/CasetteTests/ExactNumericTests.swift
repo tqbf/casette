@@ -166,6 +166,7 @@ struct ExactNumericTests {
 
         let numericByCode = fake.sentObjects
             .filter { $0["code"] != nil }
+            .filter { !(($0["code"] as? String)?.contains("__casette_tape_refs") == true) }
             .map { ($0["code"] as? String ?? "?", $0["numeric"] as? Bool) }
         // Boot prelude plain, 1/3 numeric, x (inspect) plain, 1/3 rerun numeric.
         #expect(numericByCode.map(\.1) == [nil, true, nil, true])
@@ -192,7 +193,7 @@ struct ExactNumericTests {
         let model = ShellModel()
         let fake = Self.protocolFake()
         model.connectKernel(SessionController(configuration: Self.fastConfig()) { fake })
-        #expect(model.precisionDigits == 10)
+        #expect(model.precisionDigits == defaultSessionPrecisionDigits)
         // Let the boot item finish first — a precision change BEFORE boot
         // completes would (correctly) be re-applied by the boot path itself,
         // which is the other test's subject.
@@ -212,10 +213,13 @@ struct ExactNumericTests {
         // precision change never reorders ahead of submitted work).
         let meaningful = fake.sentObjects.compactMap { request -> String? in
             if let code = request["code"] as? String { return code }
-            if request["op"] as? String == "config" { return "config" }
+            if request["op"] as? String == "config" {
+                return "config:\(request["precision_digits"] as? Int ?? -1)"
+            }
             return nil
         }
-        #expect(meaningful == [ShellModel.bootPrelude, "1/3", "config"])
+        #expect(meaningful.filter { !$0.contains("__casette_tape_refs") }
+            == [ShellModel.bootPrelude, "config:5", "1/3", "config:20"])
 
         // No-ops and invalid values send nothing and change nothing.
         model.setPrecision(20)
@@ -224,10 +228,10 @@ struct ExactNumericTests {
         #expect(model.precisionDigits == 20)
         await model.kernelQueue?.value
         let configCount = fake.sentObjects.filter { $0["op"] as? String == "config" }.count
-        #expect(configCount == 1)
+        #expect(configCount == 2)
     }
 
-    @Test("boot at the worker default sends NO config op; restart re-applies a changed precision")
+    @Test("boot applies the app default; restart re-applies a changed precision")
     func precisionReappliedAfterRestart() async {
         let model = ShellModel()
         let recorder = SentRecorder()
@@ -238,11 +242,12 @@ struct ExactNumericTests {
         }
         model.connectKernel(SessionController(configuration: Self.fastConfig()) { makeFake() })
 
-        // Boot with the default 10: the wire carries no config op at all.
+        // Boot with Casette's default 5: the worker's own default is 10, so
+        // the app applies its session default after the boot prelude.
         model.draft = "1/3"
         model.submitDraft()
         #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
-        #expect(recorder.meaningful().contains("config") == false)
+        #expect(recorder.meaningful().prefix(2) == [ShellModel.bootPrelude, "config:5"])
 
         // Change the session precision, then restart: the fresh worker
         // resets to 10, so the model must re-apply 20 (after the boot

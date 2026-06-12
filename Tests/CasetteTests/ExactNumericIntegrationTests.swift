@@ -95,7 +95,7 @@ struct ExactNumericIntegrationTests {
             model.rows.first?.status == .ok
         })
         #expect(model.rows[0].numeric == true)
-        #expect(model.rows[0].result?.plain.hasPrefix("0.3333333333") == true)
+        #expect(model.rows[0].result?.plain.hasPrefix("0.33333") == true)
         #expect(model.rows[0].result?.exactValue == "1/3")
 
         // Toggle OFF: the very next 1/3 is exact again (numeric never

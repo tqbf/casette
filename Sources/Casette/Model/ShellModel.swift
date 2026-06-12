@@ -118,6 +118,16 @@ final class ShellModel {
 
     var canClearTape: Bool { !session.rows.isEmpty }
 
+    var tapeReferences: TapeReferenceTable {
+        let entries = session.rows.enumerated().compactMap { index, row -> (Int, String)? in
+            guard let expression = row.reusableExpression else { return nil }
+            return (index + 1, expression)
+        }
+        return TapeReferenceTable(
+            entries: Dictionary(uniqueKeysWithValues: entries.suffix(TapeReferenceTable.capacity))
+        )
+    }
+
     var selectedRow: SessionRow? {
         guard let selectedRowID else { return nil }
         return session.rows.first { $0.id == selectedRowID }
@@ -404,6 +414,9 @@ final class ShellModel {
                 let evaluation = await controller.evaluate(
                     row.sage, numeric: row.numeric == true)
                 self?.applyReplay(rowID: row.id, with: evaluation)
+                if let code = self?.tapeReferenceAssignmentCode(rowID: row.id) {
+                    _ = await controller.evaluate(code)
+                }
             }
             await self?.refreshSymbols()
         }
@@ -450,7 +463,7 @@ final class ShellModel {
     var draftPreview: DraftPreview {
         let input = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return .empty }
-        switch CompiledInput.compile(input) {
+        switch CompiledInput.compile(input, tapeReferences: tapeReferences) {
         case let .ready(compiled):
             return compiled.origin == .friendly ? .generated(compiled.sage) : .rawSage
         case let .error(error):
@@ -477,7 +490,7 @@ final class ShellModel {
     private func submit(advancing: Bool) {
         let input = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
-        switch CompiledInput.compile(input) {
+        switch CompiledInput.compile(input, tapeReferences: tapeReferences) {
         case let .ready(compiled):
             submitCompiled(compiled, advancing: advancing, numeric: numericMode)
         case .error:
@@ -544,7 +557,10 @@ final class ShellModel {
     /// input doesn't compile to something submittable.
     @discardableResult
     private func submitProgrammatically(_ input: String) -> SessionRow.ID? {
-        guard case let .ready(compiled) = CompiledInput.compile(input) else { return nil }
+        guard case let .ready(compiled) = CompiledInput.compile(
+            input,
+            tapeReferences: tapeReferences
+        ) else { return nil }
         return submitCompiled(compiled, advancing: false)
     }
 
@@ -595,7 +611,7 @@ final class ShellModel {
         guard let row = session.rows.first(where: { $0.id == rowID }) else { return }
         guard rowIsLiveInKernel(row) else { return }
         let numeric = row.numeric == true
-        switch CompiledInput.compile(row.input) {
+        switch CompiledInput.compile(row.input, tapeReferences: tapeReferences) {
         case let .ready(compiled):
             submitCompiled(compiled, advancing: false, numeric: numeric)
         case .ambiguous:
@@ -688,6 +704,9 @@ final class ShellModel {
             let evaluation = await controller.evaluate(compiled.sage, numeric: numeric)
             guard let self else { return }
             complete(rowID: rowID, with: evaluation)
+            if let code = tapeReferenceAssignmentCode(rowID: rowID) {
+                _ = await controller.evaluate(code)
+            }
             await refreshSymbols()
         }
     }
@@ -751,6 +770,11 @@ final class ShellModel {
         persist()  // incremental save after EVERY completed row (V1.9)
     }
 
+    private func tapeReferenceAssignmentCode(rowID: SessionRow.ID) -> String? {
+        guard let index = session.rows.firstIndex(where: { $0.id == rowID }) else { return nil }
+        return tapeReferences.assignmentCode(for: index + 1)
+    }
+
     /// Edits a row's input in place. Identity and timestamp are stable; the
     /// input is recompiled (through the real compiler) and the stale result
     /// is cleared, so the row honestly reads as not-yet-evaluated again.
@@ -759,7 +783,10 @@ final class ShellModel {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               let index = session.rows.firstIndex(where: { $0.id == rowID }),
-              case let .ready(compiled) = CompiledInput.compile(trimmed)
+              case let .ready(compiled) = CompiledInput.compile(
+                trimmed,
+                tapeReferences: tapeReferences
+              )
         else { return }
         session.rows[index].input = compiled.raw
         session.rows[index].sage = compiled.sage

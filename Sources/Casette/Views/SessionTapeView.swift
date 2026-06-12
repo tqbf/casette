@@ -18,8 +18,9 @@ struct SessionTapeView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Theme.tapeRowSpacing) {
-                        ForEach(model.rows) { row in
+                        ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
                             TapeRowView(
+                                rowNumber: index + 1,
                                 row: row,
                                 isSelected: model.selectedRowID == row.id,
                                 isKernelConnected: model.kernelState.isConnected,
