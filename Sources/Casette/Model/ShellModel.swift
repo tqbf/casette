@@ -487,6 +487,16 @@ final class ShellModel {
         return ir
     }
 
+    var unaryFormula: UnaryFormulaIR? {
+        guard case let .unary(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var solveFormula: SolveFormulaIR? {
+        guard case let .solve(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }

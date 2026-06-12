@@ -13,6 +13,10 @@ struct FormulaBarView: View {
         switch formula {
         case let .integral(ir):
             IntegralFormulaBar(model: model, formula: ir)
+        case let .unary(ir):
+            UnaryFormulaBar(model: model, formula: ir)
+        case let .solve(ir):
+            SolveFormulaBar(model: model, formula: ir)
         }
     }
 }

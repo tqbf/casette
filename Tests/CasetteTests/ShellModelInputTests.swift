@@ -309,6 +309,45 @@ struct ShellModelInputTests {
         #expect(model.integralFormula?.upperBound == "1")
     }
 
+    @Test("unary formula bar model rewrites friendly IR")
+    func unaryFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "factor x^2 - 1"
+        guard case let .unary(formula0) = model.formulaIR, formula0.keyword == .factor else {
+            Issue.record("expected unary(factor) formula")
+            return
+        }
+        #expect(formula0.expression == "x^2 - 1")
+        #expect(model.draftPreview == .generated("factor(x^2 - 1)"))
+
+        var formula = formula0
+        formula.expression = "x^4 - 1"
+        model.updateFormula(.unary(formula))
+        #expect(model.draft == "factor x^4 - 1")
+        #expect(model.unaryFormula?.expression == "x^4 - 1")
+        #expect(model.draftPreview == .generated("factor(x^4 - 1)"))
+    }
+
+    @Test("solve formula bar model rewrites friendly IR with a for-var edit")
+    func solveFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "solve x*y = 1"
+        guard case let .solve(formula0) = model.formulaIR else {
+            Issue.record("expected solve formula")
+            return
+        }
+        #expect(formula0.equation == "x*y = 1")
+        #expect(formula0.hasExplicitVariable == false)
+
+        var formula = formula0
+        formula.variable = "x"
+        formula.hasExplicitVariable = true
+        model.updateFormula(.solve(formula))
+        #expect(model.draft == "solve x*y = 1 for x")
+        #expect(model.solveFormula?.variable == "x")
+        #expect(model.draftPreview == .generated("solve(x*y == 1, x)"))
+    }
+
     @Test("tape references use visible row numbers but only successful reusable rows are valid")
     func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
         let rows = [
