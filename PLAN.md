@@ -21,7 +21,7 @@ what actually happened lives in `PROGRESS.md`. Hard-won pattern lessons live in
 | [plans/SAGE-DOCTOR.md](plans/SAGE-DOCTOR.md) | V0.9 Sage Doctor: the discovery priority order, version/floor policy, the check list, the `--json` report contract (the V1.10 boundary), the config-storage decision (JSON at Application Support), and the **Swift process-control** pattern (`posix_spawn`+`POSIX_SPAWN_SETSID`, group-kill, SIGINT the real pid) that retires the V1.3 risk. |
 | [plans/SESSION-FORMAT.md](plans/SESSION-FORMAT.md) | V0.10 session persistence: the on-disk tape schema (header + rows + the render-ready envelope subset), storage-location policy, the cached-vs-replayed **provenance + supersede** policy, artifact path-refs + liveness (graceful degradation), atomic/incremental save + robust load (corruption quarantine, schema refusal), replay semantics, and the V1.2 (session model) / V1.9 (persistence) integration notes. |
 | [SWIFTUI-RULES.md](SWIFTUI-RULES.md) | Imperative SwiftUI rules + the failure modes that taught them. Apply up front; use as a review checklist. |
-| [PROGRESS.md](PROGRESS.md) | Dated running log of every meaningful change. |
+| [PROGRESS.md](PROGRESS.md) | Current progress summary + table of contents; detailed dated logs live in `progress/`. |
 | [PROBLEMS.md](PROBLEMS.md) | Table of contents for hard-won pattern lessons; detailed entries live in `problems/`. |
 
 ## Architecture (target, per INITIAL.md)
