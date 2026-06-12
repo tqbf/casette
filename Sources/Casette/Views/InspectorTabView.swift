@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Details for the selected tape row: the envelope fields the UI carries
-/// (kind, plain, approx, LaTeX, error), the input split (raw vs generated
-/// Sage), and the evaluation metadata (duration, time).
+/// (kind, plain, approx, LaTeX, error), artifact references (path +
+/// liveness, for plot rows), the input split (raw vs generated Sage), and
+/// the evaluation metadata (duration, time).
 struct InspectorTabView: View {
     let row: SessionRow?
 
@@ -54,6 +55,16 @@ struct InspectorTabView: View {
                         }
                     } else {
                         LabeledContent("Status", value: "Not evaluated")
+                    }
+                }
+                if let artifacts = row.result?.artifacts, !artifacts.isEmpty {
+                    Section("Artifacts") {
+                        // Artifacts have no stable identity of their own
+                        // (paths can repeat across formats); position in the
+                        // envelope's array is the honest identity.
+                        ForEach(Array(artifacts.enumerated()), id: \.offset) { _, artifact in
+                            ArtifactInspectorRow(artifact: artifact)
+                        }
                     }
                 }
                 Section("Input") {

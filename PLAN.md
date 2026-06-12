@@ -56,6 +56,49 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.6 done (live gate PASSED, all 13 checks across three rounds; one
+orchestrator fix round closed both the footer-truncation defect and the
+window-min-height balloon it briefly introduced — see PROBLEMS.md "min-height
+bomb" entry) — the sidebar is useful, not just
+visible.** All four tabs act on the session through the model.
+**Symbols** (live since V1.3) gains per-symbol actions: double-click/menu
+**insert** (append-at-end with identifier-boundary spacing — macOS 14's
+`TextEditor` exposes no cursor, the documented V1.4 constraint), **copy
+Sage** (`name = value` only for scalar kinds whose bounded summary IS the
+untruncated value, else the bare name — `SymbolEntry.sageSnippet`),
+**inspect** (evaluates the bare name like the REPL would, selects the new
+row, flips the sidebar to the Inspector — tab selection moved to
+`ShellModel.sidebarTab`), and **forget** (evaluates `del name` as a VISIBLE
+tape row through the normal submit path — deliberate: V1.9's replay re-sends
+rows in order, so a silent namespace mutation would desync a restored
+session; the existing post-eval symbols refresh removes the entry).
+**History** adds **rerun** (normal submit path: fresh row, original + draft
+untouched, friendly preludes regenerated; an ambiguous-compiling input
+re-submits its recorded resolution, never re-asks). **Inspector** adds an
+**Artifacts** section (format, liveness — "missing" reads quiet because
+it's the normal restored case — middle-truncated path, Copy Path).
+**Actions** is rebuilt around `Model/ResultAction.swift`: every frozen
+per-kind wire name maps to a title + a **stateless command** wrapping the
+row's own generated Sage (`(matrix([[1,2],[3,4]])).det()` — no `ans`
+exists; honest, previewable, replay-safe), with `diff`/`integrate`/`solve`
+naming the expression's first free variable via the compiler's own
+heuristic. Click **inserts** the visible command into the input
+(Return evaluates); the context menu offers **Evaluate Now** (submits +
+selects the fresh row) and Copy Command — the V1.6 exit criterion ("sidebar
+actions can insert or evaluate commands"), and V1.11's increment is ready.
+All sidebar evaluations ride the serial kernel queue asynchronously (the
+sidebar never blocks the calculator). V1.3 polish: the Actions footer now
+wraps (was truncating); the "first tab click" report audits clean — most
+plausibly standard macOS click-through (NSSegmentedControl takes no first
+mouse), explicitly on the live checklist. `make check` / **`make test`
+222/222** (+17: ResultAction mapping, fake-transport sidebar flows incl.
+forget-through-kernel + refresh and rerun-with-preludes, 2 real-Sage
+journeys: forget round-trip, det action → `-2`) / `make build` green; full
+V0 regression clean (one PRE-EXISTING v0/10 parallel-setenv flake,
+documented in PROBLEMS.md, green on rerun); launch/quit clean, `pgrep`
+clean. **On-screen verifier checklist (16 items) in PROGRESS.md — pending.**
+**Next: V1.7 — plot rendering v1** (after the V1.6 live gate passes).
+
 **V1.5 done (live gate PASSED after one fix round — verifier verdict: "a
 polished, native-feeling macOS calculator tape") — the tape renders math.**
 The phase spans four agent runs (implementer killed mid-phase by quota; a

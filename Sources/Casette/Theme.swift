@@ -87,6 +87,9 @@ enum Theme {
 
     // MARK: Sidebar content
     static let sidebarSectionPadding: CGFloat = 10
+    /// Indent of an action row's command preview under its title, aligning
+    /// it with the title text after the Label's icon column.
+    static let actionCommandIndent: CGFloat = 24
 
     // MARK: Row background priority (selected > hovered > clear; §7.2)
     static func rowBackground(isSelected: Bool, isHovered: Bool) -> AnyShapeStyle {

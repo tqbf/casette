@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// One history entry: the raw input plus its time, double-click or
-/// context-menu to reuse it.
+/// One history entry: the raw input plus its time. Double-click inserts it
+/// into the input; the context menu adds rerun and copy.
 struct HistoryRowView: View {
     let row: SessionRow
     let onInsert: () -> Void
+    let onRerun: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -20,8 +21,11 @@ struct HistoryRowView: View {
         .padding(.vertical, 2)
         .contentShape(.rect)
         .onTapGesture(count: 2, perform: onInsert)
+        .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Insert into Input", onInsert)
+        .accessibilityAction(named: "Rerun", onRerun)
         .contextMenu {
+            Button("Rerun", action: onRerun)
             Button("Insert into Input", action: onInsert)
             Button("Copy") { Pasteboard.copy(row.input) }
         }
@@ -31,7 +35,7 @@ struct HistoryRowView: View {
 
 #Preview {
     List(PlaceholderData.rows) { row in
-        HistoryRowView(row: row, onInsert: {})
+        HistoryRowView(row: row, onInsert: {}, onRerun: {})
     }
     .frame(width: 280, height: 300)
 }

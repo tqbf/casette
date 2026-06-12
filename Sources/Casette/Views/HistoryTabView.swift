@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Prior inputs, newest first, with quick reuse (insert/copy). Rerun
-/// arrives with the kernel (V1.3/V1.6).
+/// Prior inputs, newest first, with quick reuse: rerun (a fresh evaluation
+/// through the normal submit path), insert into input, copy.
 struct HistoryTabView: View {
     var model: ShellModel
     var focusInput: () -> Void
@@ -15,8 +15,12 @@ struct HistoryTabView: View {
             )
         } else {
             List(model.historyRows) { row in
-                HistoryRowView(row: row, onInsert: { insert(row) })
-                    .listRowSeparator(.hidden)
+                HistoryRowView(
+                    row: row,
+                    onInsert: { insert(row) },
+                    onRerun: { model.rerun(rowID: row.id) }
+                )
+                .listRowSeparator(.hidden)
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)

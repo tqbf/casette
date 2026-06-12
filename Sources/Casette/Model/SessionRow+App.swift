@@ -39,6 +39,16 @@ extension SessionRow {
     /// frozen envelope fields; presentation only.
     var cardKind: ResultCardKind { ResultCardKind(row: self) }
 
+    /// The row's Sage as a reusable EXPRESSION for follow-up commands — the
+    /// V1.6 Actions tab's `(<expr>).det()` strategy (`ResultAction`). nil
+    /// when the row can't honestly be re-stated as one expression: it never
+    /// completed ok, it's a statement (assignments and `del` echo no value),
+    /// or it's multiline raw Sage (a statement sequence doesn't parenthesize).
+    var reusableExpression: String? {
+        guard status == .ok, !isStatement, !sage.isEmpty, !sage.contains("\n") else { return nil }
+        return sage
+    }
+
     /// Applies a finished evaluation to this (pending) row. Identity, input,
     /// sage, and timestamp are untouched — only the outcome fields change.
     /// Provenance becomes `cached` with `cachedAt = date`, matching the V0.10

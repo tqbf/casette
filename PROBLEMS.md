@@ -4,6 +4,74 @@ One entry per pattern lesson that cost real debugging. Newest at top.
 
 ---
 
+## A wrapping `fixedSize` Text OUTSIDE scroll content + `.windowResizability(.contentMinSize)` = the window's MIN HEIGHT balloons to ~1600pt the moment the view appears
+
+**The symptom (V1.6 live gate).** Selecting a result row (which populates the
+Actions sidebar tab) made the whole window instantly GROW to 1100×1598 — and
+1598pt became a hard MINIMUM: AppleScript `set size`, macOS zoom-to-fit, and
+manual resize all refused to shrink it. On a 967pt-tall display the bottom
+~660pt of the window (input pane, sidebar footer) were permanently off-screen
+and unreachable. Two verification rounds burned before the repro was pinned:
+click a result row with the Actions tab visible → balloon.
+
+**The mechanism.** The Actions tab pinned a hint under its List:
+`VStack { List {...}; Text(hint).fixedSize(horizontal: false, vertical: true) }`.
+With `.windowResizability(.contentMinSize)`, AppKit asks SwiftUI for the
+content's minimum size, and that measurement proposes ~ZERO width. At zero
+width the wrapping Text lays out one character per line — ~100 lines — and
+`fixedSize(vertical: true)` makes that height a REQUIREMENT, not an ideal.
+The window's min height becomes input-pane + tape-min + ~1500pt of
+one-character-per-line hint text. Bisected by removing the Text (balloon
+gone) and confirmed by the arithmetic.
+
+**The fix + the rule.** Put wrapping helper text INSIDE the scrollable
+content (a plain final List row, `.listRowSeparator(.hidden)`): scroll
+content never participates in window min-size measurement, and a list row's
+width proposal is always the real column width, so the text wraps correctly
+at any sidebar width. General rules:
+1. Under `.windowResizability(.contentMinSize)`, every NON-scrolling view in
+   the window participates in the window's minimum size. A
+   `fixedSize(horizontal: false, vertical: true)` Text is a min-height bomb
+   there — its min height is its height at min width, which for wrapping
+   text is absurd.
+2. macOS `List` Section footers single-line-truncate at narrow widths (the
+   original V1.6 defect), so the footer idiom isn't the answer either — an
+   ordinary in-list row is.
+3. When a window won't shrink, suspect content min size, and bisect the
+   newest non-scrolling view. `set size of front window` via System Events
+   is the cheap probe (it silently clamps to the real minimum).
+
+---
+
+## Parallel swift-testing + `setenv`: tests that pass config through process-global env race every test that reads it
+
+**The symptom (V1.6 gate).** The frozen v0/10 suite — green at every prior
+gate — failed once during the V1.6 regression:
+`defaultDirectoryUsesApplicationSupportWhenNoOverride` saw a
+`/tmp/casette-cfg-<UUID>/sessions` path where it expected the Application
+Support default. Rerun: 21/21. `--no-parallel`: 21/21.
+
+**The cause.** swift-testing runs a target's tests **in parallel inside one
+process**, and environment variables are process-global. One test does
+`setenv("CASETTE_CONFIG_DIR", override, 1)` (with a deferred `unsetenv`)
+while the no-override test calls `unsetenv` and then reads the default — the
+two interleave, and the no-override test observes its sibling's override.
+The hermetic override that makes each test clean in isolation is exactly
+what makes the suite racy in parallel.
+
+**Rules.**
+1. **Don't pass test configuration through `setenv`** — inject the path/value
+   as a parameter (the SUT should take its config dir as an argument, with
+   the env var consulted only at the production call site). If env mutation
+   is unavoidable, mark the suite `.serialized`.
+2. A test failure that names a SIBLING test's fixture (here: the other
+   test's `/tmp/casette-cfg-` pattern) is a parallelism leak, not a logic
+   bug — rerun serialized before touching code.
+3. v0/ is frozen evidence, so the race stays documented rather than fixed
+   there; V1.9's app-side persistence tests must follow rule 1.
+
+---
+
 ## SwiftMath in a LIVE tape: memoize normalize+parse, and guard every `MTMathUILabel` property write — `sizeThatFits` runs each layout pass and the `latex` setter re-typesets
 
 **The trap (V1.5).** Dropping the proven V0.4 renderer into the real session

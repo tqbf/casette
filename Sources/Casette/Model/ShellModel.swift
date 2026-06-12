@@ -37,6 +37,10 @@ final class ShellModel {
     /// crash, forced stop) — drives the recovery banner. nil when healthy.
     private(set) var kernelIssue: String?
     var selectedRowID: SessionRow.ID?
+    /// Which sidebar tab is showing. Transient UI state (like selection),
+    /// model-owned so sidebar flows can switch tabs (Symbols → Inspect lands
+    /// the user on the Inspector) and tests can assert the flow.
+    var sidebarTab: SidebarTab = .symbols
     /// The input draft. Any change that is NOT a history recall counts as a
     /// user edit: it dismisses a pending ambiguity picker (the candidates
     /// describe text that no longer exists) and ends history navigation (the
@@ -222,13 +226,90 @@ final class ShellModel {
         return true
     }
 
-    private func submitCompiled(_ compiled: CompiledInput, advancing: Bool) {
+    @discardableResult
+    private func submitCompiled(_ compiled: CompiledInput, advancing: Bool) -> SessionRow.ID {
         let rowID = append(compiled)
         inputHistory.record(compiled.raw)
         if advancing {
             draft = ""
         }
         evaluate(rowID: rowID, compiled: compiled)
+        return rowID
+    }
+
+    /// Submits sidebar-initiated Sage (forget / inspect / rerun / an action's
+    /// command) through the SAME path as typed input — compile, append a tape
+    /// row, record history, evaluate on the serial kernel queue — WITHOUT
+    /// touching the draft. Returns the new row's identity, or nil if the
+    /// input doesn't compile to something submittable.
+    @discardableResult
+    private func submitProgrammatically(_ input: String) -> SessionRow.ID? {
+        guard case let .ready(compiled) = CompiledInput.compile(input) else { return nil }
+        return submitCompiled(compiled, advancing: false)
+    }
+
+    // MARK: - Sidebar: Symbols actions
+
+    /// Symbols tab → Insert: appends the symbol name to the draft, separated
+    /// from a preceding identifier/number character so names never merge
+    /// (`2 + ` + `n` → `2 + n`; `2*` + `n` → `2*n`). True at-cursor insertion
+    /// isn't buildable — macOS 14's `TextEditor` exposes no cursor to the
+    /// model (the documented V1.4 constraint) — and the cursor rests at the
+    /// end of the draft in the common case, so append IS the honest version.
+    func insertSymbolIntoDraft(_ name: String) {
+        guard let last = draft.last else {
+            draft = name
+            return
+        }
+        let needsSeparator = last.isLetter || last.isNumber || last == "_" || last == ")"
+        draft += needsSeparator ? " \(name)" : name
+    }
+
+    /// Symbols tab → Forget: evaluates `del name` through the kernel as a
+    /// REGULAR tape row, not a silent op. Deliberate: the tape is the session
+    /// log — V1.9's replay re-sends rows in order, so a namespace mutation
+    /// that isn't a row would make a restored session diverge from what the
+    /// user saw. The eval path refreshes symbols, so the entry disappears.
+    func forgetSymbol(_ name: String) {
+        submitProgrammatically("del \(name)")
+    }
+
+    /// Symbols tab → Inspect: evaluates the bare name (exactly what typing it
+    /// would do — the honest "show me this value", leaving a result row on
+    /// the tape), selects the new row, and lands on the Inspector tab.
+    func inspectSymbol(_ name: String) {
+        guard let rowID = submitProgrammatically(name) else { return }
+        select(rowID)
+        sidebarTab = .inspector
+    }
+
+    // MARK: - Sidebar: History actions
+
+    /// History tab → Rerun: re-evaluates a prior row's input through the
+    /// normal submit path — a fresh row at the end of the tape, the original
+    /// untouched, the draft untouched. An input that compiles ambiguous
+    /// re-submits its RECORDED resolution (`row.sage`); rerun never re-asks.
+    func rerun(rowID: SessionRow.ID) {
+        guard let row = session.rows.first(where: { $0.id == rowID }) else { return }
+        switch CompiledInput.compile(row.input) {
+        case let .ready(compiled):
+            submitCompiled(compiled, advancing: false)
+        case .ambiguous:
+            submitCompiled(
+                .chosenCandidate(raw: row.input, sage: row.sage), advancing: false)
+        case .error:
+            break  // a previously submitted input can't stop compiling
+        }
+    }
+
+    // MARK: - Sidebar: result actions
+
+    /// Actions tab → Evaluate Now: submits an action's built command directly
+    /// (the insert-into-input path is just `insertIntoDraft`) and selects the
+    /// new row so the Inspector and Actions follow the fresh result.
+    func evaluateActionCommand(_ command: String) {
+        guard let rowID = submitProgrammatically(command) else { return }
+        select(rowID)
     }
 
     // MARK: - History navigation (Up/Down)

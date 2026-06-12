@@ -1,19 +1,18 @@
 import SwiftUI
 
 /// The tabbed right sidebar: a segmented tab strip (Xcode-inspector style)
-/// over per-tab content. Tabs are Symbols / History / Inspector / Actions
-/// (INITIAL.md V1.1); each tab's real behavior lands in V1.6.
+/// over per-tab content — Symbols / History / Inspector / Actions (V1.6).
+/// Tab selection lives on the model so sidebar flows can switch tabs
+/// (Symbols → Inspect lands on the Inspector).
 struct SidebarView: View {
-    var model: ShellModel
+    @Bindable var model: ShellModel
     /// Hands keyboard focus back to the input pane after a sidebar action
-    /// (e.g. History → Insert into Input).
+    /// that targets the input (insert into draft).
     var focusInput: () -> Void
-
-    @State private var selectedTab: SidebarTab = .symbols
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Sidebar Tab", selection: $selectedTab) {
+            Picker("Sidebar Tab", selection: $model.sidebarTab) {
                 ForEach(SidebarTab.allCases) { tab in
                     Image(systemName: tab.systemImage)
                         .accessibilityLabel(tab.title)
@@ -26,15 +25,15 @@ struct SidebarView: View {
 
             Divider()
 
-            switch selectedTab {
+            switch model.sidebarTab {
             case .symbols:
-                SymbolsTabView(symbols: model.symbols.entries)
+                SymbolsTabView(model: model, focusInput: focusInput)
             case .history:
                 HistoryTabView(model: model, focusInput: focusInput)
             case .inspector:
                 InspectorTabView(row: model.selectedRow)
             case .actions:
-                ActionsTabView(row: model.selectedRow)
+                ActionsTabView(model: model, row: model.selectedRow, focusInput: focusInput)
             }
         }
     }

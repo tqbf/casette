@@ -1,29 +1,44 @@
 import SwiftUI
 
-/// Live user variables (placeholder data; V1.6 feeds the worker `symbols`
-/// op straight into this view).
+/// Live user variables (the worker `symbols` op, refreshed after every
+/// eval), with the V1.6 per-symbol actions: insert / copy Sage / inspect /
+/// forget.
 struct SymbolsTabView: View {
-    let symbols: [SymbolEntry]
+    var model: ShellModel
+    var focusInput: () -> Void
 
     var body: some View {
-        if symbols.isEmpty {
+        if model.symbols.entries.isEmpty {
             ContentUnavailableView(
                 "No Symbols Yet",
                 systemImage: "x.squareroot",
                 description: Text("Variables you define appear here.")
             )
         } else {
-            List(symbols) { symbol in
-                SymbolRowView(symbol: symbol)
-                    .listRowSeparator(.hidden)
+            List(model.symbols.entries) { symbol in
+                SymbolRowView(
+                    symbol: symbol,
+                    onInsert: { insert(symbol) },
+                    onInspect: { model.inspectSymbol(symbol.name) },
+                    onForget: { model.forgetSymbol(symbol.name) }
+                )
+                .listRowSeparator(.hidden)
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
         }
     }
+
+    private func insert(_ symbol: SymbolEntry) {
+        model.insertSymbolIntoDraft(symbol.name)
+        focusInput()
+    }
 }
 
 #Preview {
-    SymbolsTabView(symbols: PlaceholderData.symbols.entries)
-        .frame(width: 280, height: 400)
+    SymbolsTabView(
+        model: ShellModel(symbols: PlaceholderData.symbols),
+        focusInput: {}
+    )
+    .frame(width: 280, height: 400)
 }
