@@ -474,17 +474,27 @@ final class ShellModel {
         }
     }
 
-    /// The formula-bar IR for drafts that begin with the integral command.
-    /// It renders back to friendly input, so `#14` tape references and other
-    /// app-side source forms stay untouched until `CompiledInput.compile`.
-    var integralFormula: IntegralFormulaIR? {
-        IntegralFormulaIR.parse(draft)
+    /// The formula-bar IR for drafts that begin with a known friendly
+    /// command. It renders back to friendly input, so `#14` tape references
+    /// and other app-side source forms stay untouched until
+    /// `CompiledInput.compile`.
+    var formulaIR: FormulaIR? {
+        FormulaIR.parse(draft)
     }
 
-    func updateIntegralFormula(_ formula: IntegralFormulaIR) {
+    var integralFormula: IntegralFormulaIR? {
+        guard case let .integral(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }
         draft = newDraft
+    }
+
+    func updateIntegralFormula(_ formula: IntegralFormulaIR) {
+        updateFormula(.integral(formula))
     }
 
     /// Return: compile and evaluate, advancing (the draft clears).
