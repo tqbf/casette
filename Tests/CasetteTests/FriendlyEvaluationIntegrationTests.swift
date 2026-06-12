@@ -53,23 +53,25 @@ struct FriendlyEvaluationIntegrationTests {
         await controller.shutdown()
     }
 
-    @Test("preludes work for variables the worker does NOT predefine (t)", .timeLimit(.minutes(5)))
+    @Test("preludes work for variables NOTHING predefines (u)", .timeLimit(.minutes(5)))
     func preludeDeclaresNonX() async {
         let controller = SessionController(transportFactory: SageTestEnvironment.factory)
         let model = ShellModel()
         model.connectKernel(controller)
 
-        // The worker's star-import predefines only x (PROBLEMS.md V0.5):
-        // without the var('t') prelude this NameErrors.
-        model.draft = "integral t^2, t=0..2"
+        // The worker's star-import predefines no variables (PROBLEMS.md
+        // V0.5) and the V1.7 boot prelude covers only x/y/z/t — so `u` is
+        // declared by the friendly compiler's var('u') prelude alone;
+        // without it this NameErrors.
+        model.draft = "integral u^2, u=0..2"
         model.submitDraft()
         #expect(await eventually(timeout: .seconds(120)) { @MainActor in
             model.rows.first?.status == .ok
         })
         #expect(model.rows[0].result?.plain == "8/3")
-        // The symbol table now shows t — declared by the prelude, visibly.
+        // The symbol table now shows u — declared by the prelude, visibly.
         #expect(await eventually { @MainActor in
-            model.symbols.entries.contains { $0.name == "t" }
+            model.symbols.entries.contains { $0.name == "u" }
         })
 
         await controller.shutdown()

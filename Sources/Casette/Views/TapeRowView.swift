@@ -13,6 +13,9 @@ struct TapeRowView: View {
     let isKernelConnected: Bool
     let onSelect: () -> Void
     let onToggleExpanded: () -> Void
+    /// Re-evaluates this row's input as a fresh tape row (the plot card's
+    /// missing-PNG regenerate affordance — V1.7).
+    let onRerun: () -> Void
 
     @State private var isHovered = false
 
@@ -51,7 +54,7 @@ struct TapeRowView: View {
                     .font(Theme.Fonts.meta)
                     .foregroundStyle(.tertiary)
             }
-            TapeRowResultView(row: row, isKernelConnected: isKernelConnected)
+            TapeRowResultView(row: row, isKernelConnected: isKernelConnected, onRerun: onRerun)
             // Structural conditional with NO transition (§1.1) — same
             // precedent as the kernel banner and the ambiguity panel.
             if row.expanded {
@@ -102,7 +105,7 @@ struct TapeRowView: View {
         ForEach(PlaceholderData.rows.prefix(4)) { row in
             TapeRowView(
                 row: row, isSelected: false, isKernelConnected: false,
-                onSelect: {}, onToggleExpanded: {}
+                onSelect: {}, onToggleExpanded: {}, onRerun: {}
             )
         }
     }

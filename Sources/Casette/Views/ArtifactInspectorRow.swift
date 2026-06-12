@@ -40,7 +40,13 @@ struct ArtifactInspectorRow: View {
                 "On disk"
             }
         case .missing:
-            "Missing — rerun the row to regenerate it"
+            if let error = artifact.error {
+                // The worker's per-format save failure — honest, with the
+                // structured reason (WORKER-PROTOCOL.md V0.5).
+                "Failed to save — \(error)"
+            } else {
+                "Missing — rerun the row to regenerate it"
+            }
         }
     }
 }

@@ -23,7 +23,7 @@ enum ResultCardKind: Equatable {
     case matrix
     /// A list or tuple (incl. `solve`'s Sequence).
     case list
-    /// A plot — card chrome now, the real PNG at V1.7.
+    /// A plot — renders the PNG artifact(s) inline (V1.7).
     case plot
     /// Text, booleans, and unknown kinds — plain (or repr-degraded) content.
     case text

@@ -161,6 +161,14 @@ always stale**. Policy:
 (A nil `path` — a format that failed to save originally — also resolves to
 `missing`.)
 
+> **V1.7 additive change (same pattern as V1.5's `truncation`):** an artifact
+> gains the optional `error` field — the worker's per-format save error
+> (`"<ExcType>: <msg>"`, WORKER-PROTOCOL.md "Plot failures are structured"),
+> present only when that format failed to save (then `path` is nil). V1.7's
+> plot cards and the Inspector surface it as the honest "couldn't be saved"
+> note. Optional + omitted-when-nil, so schema **v1** files with or without it
+> round-trip unchanged and old readers ignore it — no schema bump.
+
 ---
 
 ## Provenance: cached vs replayed (and the supersede policy)

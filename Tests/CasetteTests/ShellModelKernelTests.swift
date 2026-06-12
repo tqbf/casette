@@ -71,12 +71,12 @@ struct ShellModelKernelTests {
             model.submitDraft()
         }
         #expect(await eventually { @MainActor in model.rows.allSatisfy { $0.status == .ok } })
-        // The boot prelude (the REPL-matching var('x')) leads, then the
-        // submissions strictly in tape order.
+        // The boot prelude (the calculator variables var('x, y, z, t'))
+        // leads, then the submissions strictly in tape order.
         #expect(order.values == [ShellModel.bootPrelude, "a = 1", "b = 2", "a + b"])
     }
 
-    @Test("boot and restart each apply the var('x') prelude — the real-REPL contract")
+    @Test("boot and restart each apply the var('x, y, z, t') prelude — the calculator-variables contract")
     func bootPreludeAppliedAtBootAndRestart() async {
         let model = ShellModel()
         let order = OrderRecorder()
@@ -87,7 +87,10 @@ struct ShellModelKernelTests {
             fake.respondToSend = { request in
                 guard let id = request["id"] as? String else { return [] }
                 if request["op"] as? String == "symbols" {
-                    return [WireFixtures.symbolsResponse(id: id, entries: [("x", "symbolic", "x")])]
+                    return [WireFixtures.symbolsResponse(id: id, entries: [
+                        ("t", "symbolic", "t"), ("x", "symbolic", "x"),
+                        ("y", "symbolic", "y"), ("z", "symbolic", "z"),
+                    ])]
                 }
                 order.record(request["code"] as? String ?? "?")
                 return [WireFixtures.okEnvelope(id: id, plain: "x", kind: "symbolic")]
@@ -97,20 +100,23 @@ struct ShellModelKernelTests {
         model.connectKernel(SessionController(configuration: Self.fastConfig()) { makeFake() })
 
         // Boot: the prelude is the FIRST eval, before any submission, and
-        // the sidebar refreshes — x is visible from boot, like the REPL.
-        #expect(await eventually { @MainActor in order.values == ["var('x')"] })
-        #expect(await eventually { @MainActor in model.symbols.entries.map(\.name) == ["x"] })
+        // the sidebar refreshes — all four calculator variables are visible
+        // from boot.
+        #expect(await eventually { @MainActor in order.values == ["var('x, y, z, t')"] })
+        #expect(await eventually { @MainActor in
+            model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
+        })
 
         // Raw-Sage bypass (no friendly preludes) rides on the boot prelude.
         model.draft = "expand((x+1)^8)"
         model.submitDraft()
         #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
-        #expect(order.values == ["var('x')", "expand((x+1)^8)"])
+        #expect(order.values == ["var('x, y, z, t')", "expand((x+1)^8)"])
 
         // Restart boots a fresh namespace — the prelude must be re-applied.
         model.restartKernel()
         #expect(await eventually { @MainActor in
-            order.values == ["var('x')", "expand((x+1)^8)", "var('x')"]
+            order.values == ["var('x, y, z, t')", "expand((x+1)^8)", "var('x, y, z, t')"]
         })
     }
 

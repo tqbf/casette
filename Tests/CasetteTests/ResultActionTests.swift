@@ -4,7 +4,8 @@ import Testing
 
 /// The V1.6 action→command mapping: every command action builds the honest
 /// stateless follow-up (`(<expr>).det()` — no `ans` variable exists), copy
-/// actions copy, plot actions stay inert until V1.7, and only rows whose
+/// actions copy, plot actions stay inert in this tab (the plot card's own
+/// context menu carries copy/save since V1.7), and only rows whose
 /// Sage is reusable as one expression offer commands at all.
 @Suite("ResultAction mapping")
 struct ResultActionTests {
@@ -53,12 +54,12 @@ struct ResultActionTests {
         #expect(ResultAction(name: "transpose").command(wrapping: m) == "(\(m)).transpose()")
     }
 
-    @Test("copy actions copy; plot actions are inert until V1.7; unknown degrades visibly")
+    @Test("copy actions copy; plot actions are inert in this tab; unknown degrades visibly")
     func nonCommandBehaviors() {
         #expect(ResultAction(name: "copy").behavior == .copyPlain)
         #expect(ResultAction(name: "copy_traceback").behavior == .copyTraceback)
         if case .unavailable = ResultAction(name: "save_png").behavior {} else {
-            Issue.record("save_png should be unavailable until V1.7")
+            Issue.record("save_png stays inert here — the plot card's context menu is the affordance")
         }
         if case .unavailable = ResultAction(name: "frobulate").behavior {} else {
             Issue.record("an unknown wire name must degrade to unavailable, never crash")

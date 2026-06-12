@@ -32,8 +32,22 @@ enum Theme {
     static let rowPaddingHorizontal: CGFloat = 12
     static let rowPaddingVertical: CGFloat = 10
     static let rowInnerSpacing: CGFloat = 5
-    static let plotPlaceholderWidth: CGFloat = 220
-    static let plotPlaceholderHeight: CGFloat = 130
+    // MARK: Plot cards (V1.7)
+    /// The quiet fixed-size box shown while a plot PNG decodes and when it's
+    /// missing (the honest restored/failed state) — fixed so the tape never
+    /// jumps while an image loads.
+    static let plotPlaceholderWidth: CGFloat = 260
+    static let plotPlaceholderHeight: CGFloat = 150
+    /// Tallest an inline plot image renders in a card (aspect-preserving,
+    /// never upscaled past its natural size; click to expand for full size).
+    static let plotMaxHeight: CGFloat = 280
+    /// The zoom sheet: floors, ideal-size caps, and chrome paddings.
+    static let plotZoomMinWidth: CGFloat = 520
+    static let plotZoomMinHeight: CGFloat = 420
+    static let plotZoomMaxIdealWidth: CGFloat = 1000
+    static let plotZoomMaxIdealHeight: CGFloat = 760
+    static let plotZoomChromePadding: CGFloat = 12
+    static let plotZoomImagePadding: CGFloat = 16
 
     // MARK: Math (SwiftMath point sizes)
     //

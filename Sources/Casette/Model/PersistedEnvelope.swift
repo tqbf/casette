@@ -159,19 +159,27 @@ public struct PersistedArtifact: Codable, Equatable, Sendable {
   public var bytes: Int?
   /// Resolved liveness: present / missing. Recomputed by `resolveLiveness()`.
   public var status: ArtifactStatus
+  /// The worker's per-format save error (`"<ExcType>: <msg>"`), present only
+  /// when this format failed to save — then `path` is nil
+  /// (WORKER-PROTOCOL.md "Plot failures are structured"). V1.7 additive
+  /// field, documented in SESSION-FORMAT.md: optional + omitted-when-nil, so
+  /// schema v1 files with or without it round-trip unchanged.
+  public var error: String?
 
   public init(
     type: String,
     format: String,
     path: String?,
     bytes: Int? = nil,
-    status: ArtifactStatus = .present
+    status: ArtifactStatus = .present,
+    error: String? = nil
   ) {
     self.type = type
     self.format = format
     self.path = path
     self.bytes = bytes
     self.status = status
+    self.error = error
   }
 
   /// Returns a copy with `status` recomputed against the filesystem now.

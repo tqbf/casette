@@ -56,6 +56,44 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.7 done (live gate PASSED after one fix round — all hang repros dead at
+0.0–0.1% CPU under a 2-minute mixed-interaction stress; implicit_plot works
+out of the box).** The first live gate failed on (1) an
+**AttributeGraph infinite-update-loop hang** (100% CPU, frozen app, around
+plot rows — see the new PROBLEMS.md "AttributeGraph spin" entry; fixed
+structurally: pure offscreen `sizeThatFits` + change-guarded NSView writes
+in `SwiftMathRenderer`, and explicit computed `.frame(width:height:)`
+sizing in `PlotImageWell` via the pure, unit-tested `fittedDisplaySize`)
+and (2) **implicit_plot NameError'ing on `y` out of the box** (fixed:
+`ShellModel.bootPrelude` is now `var('x, y, z, t')` — a deliberate,
+documented deviation from strict REPL fidelity; plans/FRIENDLY-COMPILER.md
+Variable policy, V1.7). Tests now **236/236** (details in PROGRESS.md's
+fix-round section).
+Plot rows render the real PNG inline (bounded 280pt, aspect-preserving,
+never upscaled; **PNG only** — the frozen V0.5 verdict, SVG stays
+model/Inspector-only). Loading is off the main thread through
+`PlotImageCache` (a `@MainActor` bounded memo over a `nonisolated` async
+`CGImageSource` decode — decode-verified, so a non-nil image IS a real
+raster; the `MathRenderCache` pattern). Click → a **standard sheet** at
+full resolution (Esc native via the Done button's `.cancelAction`; opens at
+the image's natural size, capped). Right-click the image → Expand Plot /
+Copy Image / Save Image As… / Reveal in Finder. Multi-plot evals stack one
+image per plot (the renditions are the envelope's PNG artifacts in call
+order — `Model/PlotRendition.swift`, the testable selection logic). A
+missing or save-failed PNG shows the honest quiet box with a **Rerun**
+button (the History rerun path: fresh row, original untouched); the ONE
+additive schema field `PersistedArtifact.error` carries the worker's
+per-format save error (SESSION-FORMAT.md, same pattern as V1.5's
+`truncation`), surfaced on the card and the Inspector. `make check` /
+**`make test` 231/231** (+9: rendition mapping incl. multi-plot +
+missing-PNG selection, additive-field Codable compat, decode-verifying
+cache, fake-transport artifacts→row flow + rerun, and a real-Sage journey:
+`plot` → present decodable PNG on disk, `implicit_plot`, multi-`show()`,
+failing plot = readable error) / `make build` green; full V0 regression
+clean (exact counts in PROGRESS.md); launch/quit clean, `pgrep` clean.
+**On-screen verifier checklist (15 items) in PROGRESS.md — pending.**
+**Next: V1.8 — exact/numeric controls** (after the V1.7 live gate passes).
+
 **V1.6 done (live gate PASSED, all 13 checks across three rounds; one
 orchestrator fix round closed both the footer-truncation defect and the
 window-min-height balloon it briefly introduced — see PROBLEMS.md "min-height

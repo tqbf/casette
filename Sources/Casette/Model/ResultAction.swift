@@ -25,8 +25,9 @@ struct ResultAction: Identifiable, Equatable, Sendable {
         case copyPlain
         /// Copies the error traceback (`copy_traceback`).
         case copyTraceback
-        /// Listed by the worker but not actionable here yet — shown inert
-        /// with the reason (plot save/show arrive with V1.7 rendering).
+        /// Listed by the worker but not actionable from THIS tab — shown
+        /// inert with the reason (plot save/copy live on the plot card's own
+        /// context menu since V1.7; richer wiring is V1.11).
         case unavailable(String)
     }
 
@@ -93,7 +94,7 @@ struct ResultAction: Identifiable, Equatable, Sendable {
         case "copy": .copyPlain
         case "copy_traceback": .copyTraceback
         case "save_png", "save_svg", "show":
-            .unavailable("Plot actions arrive with plot rendering (V1.7).")
+            .unavailable("Use the plot image on the tape — click to expand; right-click to copy or save.")
         case _ where commandTemplateExists: .command
         default: .unavailable("Not supported by this version of Casette.")
         }

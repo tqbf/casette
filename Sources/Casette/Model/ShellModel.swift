@@ -92,18 +92,25 @@ final class ShellModel {
     // MARK: - Kernel
 
     /// The boot prelude, sent (and discarded) right after every boot AND
-    /// every restart. The real Sage REPL predefines `x` as a symbolic
-    /// variable at startup; the worker's bare star-import does NOT
-    /// (PROBLEMS.md V0.5), so raw-Sage inputs like `expand((x+1)^8)` — which
-    /// bypass the friendly compiler and its `var('V')` preludes —
-    /// NameError'd where the real REPL succeeds. Matching the REPL app-side
-    /// keeps worker.py byte-frozen; `x` honestly appears in the Symbols
-    /// sidebar from boot (the REPL predefines it too). Re-declaring is
-    /// idempotent, so a friendly `var('x')` prelude on top is harmless.
-    static let bootPrelude = "var('x')"
+    /// every restart. The real Sage REPL predefines only `x` as a symbolic
+    /// variable at startup; the worker's bare star-import predefines NONE
+    /// (PROBLEMS.md V0.5), so raw-Sage inputs — which bypass the friendly
+    /// compiler and its `var('V')` preludes — NameError'd where the real
+    /// REPL succeeds.
+    ///
+    /// V1.7 deliberately goes BEYOND strict REPL fidelity (an approved
+    /// product call, documented in plans/FRIENDLY-COMPILER.md): a calculator
+    /// user reasonably expects `implicit_plot(x^2+y^2==1, (x,-2,2),
+    /// (y,-2,2))`, parametric plots over `t`, and 3D examples over `y`/`z`
+    /// to work out of the box, exactly as the upstream docs write them.
+    /// `var('x, y, z, t')` covers the conventional calculator variables; all
+    /// four honestly appear in the Symbols sidebar from boot. Declaring is
+    /// idempotent, so friendly `var('V')` preludes on top are harmless, and
+    /// worker.py stays byte-frozen (the prelude is app-side).
+    static let bootPrelude = "var('x, y, z, t')"
 
     /// Attaches the kernel controller, starts watching its status stream,
-    /// and boots Sage (followed by the REPL-matching `var('x')` prelude and
+    /// and boots Sage (followed by the `var('x, y, z, t')` boot prelude and
     /// a symbol refresh). With no controller attached (previews, pure model
     /// tests) submissions stay honestly pending, exactly like V1.2.
     func connectKernel(_ controller: SessionController = SessionController()) {
@@ -125,8 +132,8 @@ final class ShellModel {
 
     /// Intentionally resets the session's Sage state: kills the worker,
     /// boots a fresh one, re-applies the boot prelude (the fresh namespace
-    /// must match the real REPL too), and refreshes the symbol table (now
-    /// just `x`). NOT chained behind pending evaluations — restart is the
+    /// gets the same calculator variables), and refreshes the symbol table
+    /// (back to `x, y, z, t`). NOT chained behind pending evaluations — restart is the
     /// escape hatch and must preempt a stuck eval (which then finishes as
     /// interrupted).
     func restartKernel() {

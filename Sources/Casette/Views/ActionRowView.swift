@@ -78,7 +78,9 @@ struct ActionRowView: View {
             onEvaluate: {}
         )
         ActionRowView(title: "Copy Traceback", copyValue: "Traceback...")
-        ActionRowView(title: "Save PNG", disabledReason: "Plot actions arrive with V1.7.")
+        ActionRowView(
+            title: "Save PNG",
+            disabledReason: "Use the plot image on the tape — click to expand; right-click to copy or save.")
     }
     .frame(width: 280, height: 300)
 }

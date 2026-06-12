@@ -82,7 +82,8 @@ extension PersistedArtifact {
     let format = entry["format"] as? String ?? "png"
     let path = entry["path"] as? String
     let bytes = entry["bytes"] as? Int
-    self.init(type: type, format: format, path: path, bytes: bytes)
+    let error = entry["error"] as? String
+    self.init(type: type, format: format, path: path, bytes: bytes, error: error)
     self = resolvingLiveness()
   }
 }

@@ -13,6 +13,9 @@ import SwiftUI
 struct TapeRowResultView: View {
     let row: SessionRow
     let isKernelConnected: Bool
+    /// Re-evaluates this row (a fresh tape row via the History rerun path) —
+    /// the plot card's regenerate affordance for missing artifacts (V1.7).
+    let onRerun: () -> Void
 
     var body: some View {
         switch row.cardKind {
@@ -43,7 +46,11 @@ struct TapeRowResultView: View {
                 StdoutBlockView(stdout: stdout)
             }
         case .plot:
-            stdoutAndThen { PlotPlaceholderView(caption: row.result?.plain ?? "") }
+            stdoutAndThen {
+                if let result = row.result {
+                    PlotCardView(result: result, title: row.input, onRerun: onRerun)
+                }
+            }
         case .scalarExact, .scalarApproximate, .symbolic, .matrix, .list, .text:
             stdoutAndThen {
                 if let result = row.result {
@@ -85,7 +92,7 @@ struct TapeRowResultView: View {
 #Preview {
     VStack(alignment: .leading, spacing: 16) {
         ForEach(PlaceholderData.rows) { row in
-            TapeRowResultView(row: row, isKernelConnected: false)
+            TapeRowResultView(row: row, isKernelConnected: false, onRerun: {})
         }
     }
     .padding()

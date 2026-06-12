@@ -61,11 +61,13 @@ struct ResultRenderingIntegrationTests {
         await controller.shutdown()
     }
 
-    @Test("x is predefined at boot and after restart — the REPL-matching prelude", .timeLimit(.minutes(5)))
+    @Test("x, y, z, t are predefined at boot and after restart — the calculator-variables prelude", .timeLimit(.minutes(5)))
     func bootPreludeMatchesTheRealREPL() async {
         // Through the ShellModel seam, where the boot prelude lives: a
         // raw-Sage bypass over `x` (no friendly var('V') preludes) must work
-        // straight after boot, exactly as in the real `sage` REPL.
+        // straight after boot, exactly as in the real `sage` REPL — plus
+        // the V1.7 calculator-variables deviation (y, z, t too; see
+        // plans/FRIENDLY-COMPILER.md).
         let controller = SessionController(transportFactory: SageTestEnvironment.factory)
         let model = ShellModel()
         model.connectKernel(controller)
@@ -79,15 +81,16 @@ struct ResultRenderingIntegrationTests {
         #expect(model.rows[0].result?.error == nil)
         #expect(model.rows[0].result?.plain.contains("x^8") == true)
         #expect(model.rows[0].result?.latex?.contains("x^{8}") == true)
-        // The sidebar honestly shows the predefined x, like the REPL does.
+        // The sidebar honestly shows ALL the predefined calculator
+        // variables (worker-sorted by name).
         #expect(await eventually { @MainActor in
-            model.symbols.entries.contains { $0.name == "x" }
+            model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
         })
 
         // Restart resets the namespace; the prelude must be re-applied.
         model.restartKernel()
         #expect(await eventually(timeout: .seconds(120)) { @MainActor in
-            model.symbols.entries.map(\.name) == ["x"]
+            model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
         })
         model.draft = "expand((x+1)^2)"
         model.submitDraft()

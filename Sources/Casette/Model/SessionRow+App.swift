@@ -19,7 +19,8 @@ extension SessionRow {
         return result.kind == "none" || result.plain.isEmpty
     }
 
-    /// The row's result is a plot (V1.7 renders the PNG artifact).
+    /// The row's result is a plot (the card renders its PNG artifacts —
+    /// V1.7).
     var isPlot: Bool { result?.kind == "plot" }
 
     /// The row was submitted but its evaluation has not completed —
