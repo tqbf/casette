@@ -29,10 +29,42 @@ INFO_PLIST_SRC="Resources/Info.plist"
 # Build number: monotonic-ish from the date so re-signs differ. Falls back to 1.
 BUILD_NUMBER="$(date +%Y%m%d%H%M 2>/dev/null || echo 1)"
 
+patch_swiftmath_bundle_accessor() {
+	local accessor="$BIN_PATH/SwiftMath.build/DerivedSources/resource_bundle_accessor.swift"
+	if [ ! -f "$accessor" ]; then
+		return
+	fi
+	perl -0pi -e 's/Bundle\(path: -e\)/Bundle(path: \$0)/g' "$accessor"
+	if grep -q 'Bundle(path: \$0)' "$accessor"; then
+		return
+	fi
+
+	if ! grep -q "resourceURL?.appendingPathComponent(\"SwiftMath_SwiftMath.bundle\")" "$accessor"; then
+		perl -0pi -e 's/(let mainPath = Bundle\.main\.bundleURL\.appendingPathComponent\("SwiftMath_SwiftMath\.bundle"\)\.path\n)(\s*let buildPath = )/$1        let resourcePath = Bundle.main.resourceURL?.appendingPathComponent("SwiftMath_SwiftMath.bundle").path\n$2/' "$accessor"
+	fi
+	if ! grep -q "let resourceBundle =" "$accessor"; then
+		perl -0pi -e 's/(let preferredBundle = Bundle\(path: mainPath\)\n)/$1        let resourceBundle = resourcePath.flatMap { Bundle(path: \$0) }\n/' "$accessor"
+	fi
+	perl -0pi -e 's/preferredBundle \?\? Bundle\(path: buildPath\)/preferredBundle ?? resourceBundle ?? Bundle(path: buildPath)/' "$accessor"
+
+	if ! grep -q "resourceBundle ?? Bundle(path: buildPath)" "$accessor"; then
+		echo "✗ failed to patch SwiftMath resource accessor" >&2
+		exit 1
+	fi
+	touch "$accessor"
+}
+
+BIN_PATH="$(swift build -c "$CONFIG" --show-bin-path)"
+patch_swiftmath_bundle_accessor
+
 echo "→ swift build -c $CONFIG"
 swift build -c "$CONFIG"
 
-BIN_PATH="$(swift build -c "$CONFIG" --show-bin-path)"
+patch_swiftmath_bundle_accessor
+
+echo "→ swift build -c $CONFIG (patched SwiftMath resource lookup)"
+swift build -c "$CONFIG"
+
 EXECUTABLE="$BIN_PATH/$APP_NAME"
 if [ ! -x "$EXECUTABLE" ]; then
 	echo "✗ executable not found at $EXECUTABLE" >&2
@@ -62,8 +94,9 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 cp v0/01-worker-protocol/worker.py "$APP/Contents/Resources/worker.py"
 
 # SwiftPM resource bundles — SwiftMath ships its math fonts as
-# SwiftMath_SwiftMath.bundle/mathFonts.bundle; without it in Resources the
-# math labels render nothing at runtime (the V0.4 bundle.sh lesson).
+# SwiftMath_SwiftMath.bundle/mathFonts.bundle; without it under Resources the
+# math labels crash once the app is copied away from the developer `.build`
+# fallback. The generated accessor is patched above to search this location.
 for bundle in "$BIN_PATH"/*.bundle; do
 	if [ -e "$bundle" ]; then
 		cp -R "$bundle" "$APP/Contents/Resources/"

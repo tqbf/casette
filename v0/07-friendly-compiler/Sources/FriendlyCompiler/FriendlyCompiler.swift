@@ -1,8 +1,9 @@
 // The friendly input compiler — a COMMAND SHIM, not a language.
 //
 // Input is one line. If it begins with a known command word followed by a space
-// (or is exactly a command word), we treat it as friendly and rewrite it to a
-// single Sage expression. Otherwise it BYPASSES untouched as raw Sage. We never
+// (or is exactly a command word), we treat it as friendly and rewrite it to Sage
+// source. Simple assignments are also rewritten to echo their assigned value in
+// the tape. Otherwise input BYPASSES untouched as raw Sage. We never
 // build a full math parser: expression payloads pass through structurally; we
 // tokenize only enough to find the command, the expression, and the clauses
 // (ranges `x=0..1`, `wrt x`, `->`, `order=7`, `for x`). We DO validate balanced
@@ -27,6 +28,12 @@ public enum FriendlyCompiler {
         // Identify a leading command word (longest match first: "double integral"
         // before "integral" never applies, but multi-word commands are handled).
         guard let cmd = leadingCommand(input) else {
+            if let matrixShorthand = matlabMatrixShorthand(input) {
+                return matrixShorthand
+            }
+            if let assignment = simpleAssignmentEcho(input) {
+                return assignment
+            }
             // No known command word → raw Sage. Pass through untouched.
             return .bypass(rawSage: input)
         }
@@ -111,9 +118,9 @@ public enum FriendlyCompiler {
             case .limit: return "Try: limit sin(x)/x, x->0"
             case .taylor: return "Try: taylor sin(x), x=0, order=7"
             case .plot: return "Try: plot sin(x), x=-pi..pi"
-            case .matrix: return "Try: matrix [[1,2],[3,4]]"
-            case .eigenvalues: return "Try: eigenvalues [[1,2],[3,4]]"
-            case .rref: return "Try: rref [[1,2],[3,4]]"
+            case .matrix: return "Try: matrix [1,2; 3,4]"
+            case .eigenvalues: return "Try: eigenvalues [1,2; 3,4]"
+            case .rref: return "Try: rref [1,2; 3,4]"
             }
         }
     }
@@ -464,25 +471,117 @@ public enum FriendlyCompiler {
     // MARK: - Form: matrix / eigenvalues / rref
 
     private static func matrixForm(_ payload: String) -> CompileResult {
-        let body = payload.trimmedShim
-        guard body.hasPrefix("[") else {
+        guard let body = normalizeMatrixPayload(payload) else {
             return .error(CompileError(
                 message: "`matrix` needs a bracketed list of rows.",
-                suggestion: "Try: matrix [[1,2],[3,4]]"
+                suggestion: "Try: matrix [1,2; 3,4]"
             ))
         }
         return .success(generatedSage: "matrix(\(body))", requiredVariables: [])
     }
 
     private static func matrixMethod(_ payload: String, method: String) -> CompileResult {
-        let body = payload.trimmedShim
-        guard body.hasPrefix("[") else {
+        guard let body = normalizeMatrixPayload(payload) else {
             return .error(CompileError(
                 message: "`\(method)` needs a bracketed list of rows.",
-                suggestion: "Try: \(method) [[1,2],[3,4]]"
+                suggestion: "Try: \(method) [1,2; 3,4]"
             ))
         }
         return .success(generatedSage: "matrix(\(body)).\(method)()", requiredVariables: [])
+    }
+
+    private static func matlabMatrixShorthand(_ input: String) -> CompileResult? {
+        if let assignment = splitEquation(input),
+           Variables.isPlausibleVariable(assignment.lhs),
+           let generated = matlabMatrixGeneratedSage(
+               payload: assignment.rhs,
+               baseOffset: utf8Offset(of: assignment.rhs, in: input),
+               wrap: { "\(assignment.lhs) = matrix(\($0))\n\(assignment.lhs)" }) {
+            return generated
+        }
+
+        return matlabMatrixGeneratedSage(
+            payload: input,
+            baseOffset: 0,
+            wrap: { "matrix(\($0))" })
+    }
+
+    private static func matlabMatrixGeneratedSage(
+        payload: String,
+        baseOffset: Int,
+        wrap: (String) -> String
+    ) -> CompileResult? {
+        let body = payload.trimmedShim
+        guard body.hasPrefix("["), body.contains(";") else { return nil }
+
+        if let bal = Scanner.balanceError(in: body) {
+            return .error(balanceCompileError(bal, baseOffset: baseOffset, input: body))
+        }
+
+        guard let normalized = normalizeMatrixPayload(body, requiresTopLevelSemicolon: true) else {
+            return .error(CompileError(
+                message: "MATLAB-style matrix literal is malformed.",
+                position: nil,
+                suggestion: "Try: [1,2; 3,4] or A = [1,2; 3,4]"
+            ))
+        }
+
+        return .success(
+            generatedSage: wrap(normalized),
+            requiredVariables: Variables.freeVariables(in: normalized))
+    }
+
+    private static func simpleAssignmentEcho(_ input: String) -> CompileResult? {
+        guard let assignment = splitEquation(input),
+              Variables.isPlausibleVariable(assignment.lhs) else { return nil }
+        return .success(
+            generatedSage: "\(assignment.lhs) = \(assignment.rhs)\n\(assignment.lhs)",
+            requiredVariables: Variables.freeVariables(in: assignment.rhs))
+    }
+
+    /// Accept both Sage's row-list form (`[[1,2],[3,4]]`) and MATLAB-style
+    /// matrix literals (`[1,2; 3,4]`). The latter is normalized into Sage's
+    /// list-of-rows form while preserving the text of each cell expression.
+    private static func normalizeMatrixPayload(
+        _ payload: String,
+        requiresTopLevelSemicolon: Bool = false
+    ) -> String? {
+        let body = payload.trimmedShim
+        guard body.hasPrefix("[") else { return nil }
+        guard let inside = singleOuterBracketBody(body) else {
+            return requiresTopLevelSemicolon ? nil : body
+        }
+
+        let inner = inside.trimmedShim
+        guard !inner.hasPrefix("[") else {
+            return requiresTopLevelSemicolon ? nil : body
+        }
+
+        let rows = Scanner.splitTopLevelSemicolons(inside)
+        guard !requiresTopLevelSemicolon || rows.count > 1 else { return nil }
+        guard !rows.isEmpty, rows.allSatisfy({ !$0.isEmpty }) else { return nil }
+
+        let sageRows = rows.map { row in
+            let cells = Scanner.splitTopLevelCommas(row)
+            guard !cells.isEmpty, cells.allSatisfy({ !$0.isEmpty }) else { return "" }
+            return "[\(cells.joined(separator: ","))]"
+        }
+        guard sageRows.allSatisfy({ !$0.isEmpty }) else { return nil }
+        return "[\(sageRows.joined(separator: ","))]"
+    }
+
+    private static func singleOuterBracketBody(_ body: String) -> String? {
+        guard body.first == "[", body.last == "]" else { return nil }
+        var depth = 0
+        for (offset, ch) in body.enumerated() {
+            if ch == "[" {
+                depth += 1
+            } else if ch == "]" {
+                depth -= 1
+                if depth == 0, offset != body.count - 1 { return nil }
+            }
+        }
+        return String(body.dropFirst().dropLast())
     }
 
     // MARK: - Range / clause parsing helpers
@@ -628,5 +727,10 @@ public enum FriendlyCompiler {
             if !seen.contains(i) { seen.insert(i); out.append(i) }
         }
         return out
+    }
+
+    private static func utf8Offset(of needle: String, in haystack: String) -> Int {
+        guard let range = haystack.range(of: needle, options: .backwards) else { return 0 }
+        return haystack[haystack.startIndex..<range.lowerBound].utf8.count
     }
 }

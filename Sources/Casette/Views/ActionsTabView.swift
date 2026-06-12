@@ -2,10 +2,9 @@ import SwiftUI
 
 /// Context-sensitive actions for the selected result, straight from the
 /// envelope's per-kind `actions` list (V1.6). Clicking a command action
-/// INSERTS its built Sage command into the input — previewable, editable,
-/// Return evaluates — and the context menu offers Evaluate Now / Copy
-/// Command. Copy-style actions copy directly. V1.11 polishes the
-/// preview-vs-evaluate story; the command strategy lives in `ResultAction`.
+/// evaluates its built Sage command immediately; the context menu offers
+/// expansion into the input for editing, plus copy. Copy-style actions copy
+/// directly. The command strategy lives in `ResultAction`.
 struct ActionsTabView: View {
     var model: ShellModel
     let row: SessionRow?
@@ -94,7 +93,7 @@ struct ActionsTabView: View {
         if expression == nil {
             "This row's input isn't a single expression, so follow-up commands can't be built from it."
         } else {
-            "Click inserts the command into the input — press Return to evaluate. Right-click to evaluate immediately."
+            "Click evaluates the command immediately. Right-click to expand it into the input."
         }
     }
 

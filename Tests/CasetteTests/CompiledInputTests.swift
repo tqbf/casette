@@ -43,8 +43,8 @@ struct CompiledInputTests {
         // Outer bound variable first, then inner — the frozen V0.7 order.
         #expect(compiled.requiredVariables == ["u", "v"])
         #expect(compiled.preludes == ["var('u')", "var('v')"])
-        // The generated Sage stays a single clean expression — the preludes
-        // are what's SENT, never what's displayed.
+        // The generated Sage contains no declaration plumbing — the preludes
+        // are what's SENT before it, never what's displayed.
         #expect(!compiled.sage.contains("var("))
     }
 

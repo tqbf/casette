@@ -53,6 +53,54 @@ struct FriendlyEvaluationIntegrationTests {
         await controller.shutdown()
     }
 
+    @Test("MATLAB-style matrix literal compiles and evaluates as a matrix", .timeLimit(.minutes(5)))
+    func matlabMatrixEndToEnd() async {
+        let controller = SessionController(transportFactory: SageTestEnvironment.factory)
+        let model = ShellModel()
+        model.connectKernel(controller)
+
+        model.draft = "matrix [1, 2, 3 ; 2, 3, 4 ]"
+        model.submitDraft()
+        #expect(await eventually(timeout: .seconds(120)) { @MainActor in
+            model.rows.first?.status == .ok
+        })
+
+        let row = model.rows[0]
+        #expect(row.input == "matrix [1, 2, 3 ; 2, 3, 4 ]")
+        #expect(row.sage == "matrix([[1,2,3],[2,3,4]])")
+        #expect(row.result?.kind == "matrix")
+        #expect(row.result?.plain == "[1 2 3]\n[2 3 4]")
+
+        await controller.shutdown()
+    }
+
+    @Test("MATLAB-style matrix assignment creates a Sage matrix variable", .timeLimit(.minutes(5)))
+    func matlabMatrixAssignmentEndToEnd() async {
+        let controller = SessionController(transportFactory: SageTestEnvironment.factory)
+        let model = ShellModel()
+        model.connectKernel(controller)
+
+        model.draft = "A = [1, 2, 3 ; 2, 3, 4 ]"
+        model.submitDraft()
+        #expect(await eventually(timeout: .seconds(120)) { @MainActor in
+            model.rows.first?.status == .ok
+        })
+
+        let row = model.rows[0]
+        #expect(row.input == "A = [1, 2, 3 ; 2, 3, 4 ]")
+        #expect(row.sage == "A = matrix([[1,2,3],[2,3,4]])\nA")
+        #expect(row.result?.kind == "matrix")
+        #expect(row.result?.plain == "[1 2 3]\n[2 3 4]")
+        #expect(row.reusableExpression == "A")
+        #expect(await eventually { @MainActor in
+            model.symbols.entries.contains { entry in
+                entry.name == "A" && entry.kind == "matrix"
+            }
+        })
+
+        await controller.shutdown()
+    }
+
     @Test("preludes work for variables NOTHING predefines (u)", .timeLimit(.minutes(5)))
     func preludeDeclaresNonX() async {
         let controller = SessionController(transportFactory: SageTestEnvironment.factory)

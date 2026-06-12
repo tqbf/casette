@@ -31,9 +31,9 @@ struct CompiledInput: Equatable, Sendable {
     /// The raw text the user typed (`factor x^4 - 1`).
     var raw: String
     /// The Sage to evaluate (`factor(x^4 - 1)`); equal to `raw` for a bypass.
+    /// Assignment echoes may contain a final expression line (`A = ...\nA`).
     /// This is what the row displays as "Generated Sage" — preludes are
-    /// session plumbing and deliberately NOT part of it (FRIENDLY-COMPILER.md
-    /// variable policy: the generated Sage stays a single clean expression).
+    /// session plumbing and deliberately NOT part of it.
     var sage: String
     /// Free variables the compiler says need `var('V')` preludes (V0.7 policy:
     /// the compiler reports, never injects). Empty for a bypass.

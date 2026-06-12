@@ -11,9 +11,9 @@ import Foundation
 extension SessionRow: Identifiable {}
 
 extension SessionRow {
-    /// A statement (assignment) echoes no value — the row renders input only.
-    /// Derived, never stored: the worker reports a statement as `kind:"none"`
-    /// with an empty `plain` (V0.1 None-suppression).
+    /// A worker statement with no echoed value — the row renders input only.
+    /// Simple assignments compiled by the app append a final expression and
+    /// therefore normally render the assigned value instead.
     var isStatement: Bool {
         guard status == .ok, let result else { return false }
         return result.kind == "none" || result.plain.isEmpty
@@ -41,12 +41,13 @@ extension SessionRow {
     var cardKind: ResultCardKind { ResultCardKind(row: self) }
 
     /// The row's Sage as a reusable EXPRESSION for follow-up commands — the
-    /// V1.6 Actions tab's `(<expr>).det()` strategy (`ResultAction`). nil
-    /// when the row can't honestly be re-stated as one expression: it never
-    /// completed ok, it's a statement (assignments and `del` echo no value),
-    /// or it's multiline raw Sage (a statement sequence doesn't parenthesize).
+    /// V1.6 Actions tab's `(<expr>).det()` strategy (`ResultAction`). For an
+    /// echoed assignment (`A = ...\nA`), the reusable expression is the assigned
+    /// name. nil when the row can't honestly be re-stated as one expression.
     var reusableExpression: String? {
-        guard status == .ok, !isStatement, !sage.isEmpty, !sage.contains("\n") else { return nil }
+        guard status == .ok, !isStatement, !sage.isEmpty else { return nil }
+        if let assignedName = assignmentEchoName(in: sage) { return assignedName }
+        guard !sage.contains("\n") else { return nil }
         return sage
     }
 
@@ -73,6 +74,23 @@ extension SessionRow {
         result = evaluation.result
         durationSeconds = evaluation.duration
         provenance = Provenance(kind: .cached, cachedAt: date)
+    }
+}
+
+private func assignmentEchoName(in sage: String) -> String? {
+    let lines = sage.split(separator: "\n", omittingEmptySubsequences: false)
+    guard lines.count == 2 else { return nil }
+    let echo = lines[1].trimmedApp
+    guard !echo.isEmpty, lines[0].trimmedApp.hasPrefix("\(echo) =") else { return nil }
+    return echo.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" } ? echo : nil
+}
+
+private extension StringProtocol {
+    var trimmedApp: String {
+        var sub = Substring(self)
+        while let first = sub.first, first == " " || first == "\t" { sub = sub.dropFirst() }
+        while let last = sub.last, last == " " || last == "\t" { sub = sub.dropLast() }
+        return String(sub)
     }
 }
 

@@ -76,7 +76,7 @@ struct ResultActionTests {
             == ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"])
     }
 
-    @Test("reusableExpression: ok value rows yes; statements, errors, multiline no")
+    @Test("reusableExpression: ok value rows yes, echoed assignments use the name")
     func reusableExpression() {
         func row(
             sage: String, status: RowStatus, kind: String = "integer", plain: String = "4"
@@ -87,8 +87,11 @@ struct ResultActionTests {
                 status: status, timestamp: .now)
         }
         #expect(row(sage: "2 + 2", status: .ok).reusableExpression == "2 + 2")
-        // A statement (assignment, del) echoes no value — nothing to reuse.
+        // A no-value statement has nothing to reuse.
         #expect(row(sage: "a = 5", status: .ok, kind: "none", plain: "").reusableExpression == nil)
+        #expect(row(sage: "a = 5\na", status: .ok, plain: "5").reusableExpression == "a")
+        #expect(row(sage: "A = matrix([[1,2],[3,4]])\nA", status: .ok, kind: "matrix", plain: "[1 2]\n[3 4]")
+            .reusableExpression == "A")
         // Multiline raw Sage is a statement sequence, not an expression.
         #expect(row(sage: "a = 5\na * 9", status: .ok, plain: "45").reusableExpression == nil)
         // Errors and pending rows have no reusable value.

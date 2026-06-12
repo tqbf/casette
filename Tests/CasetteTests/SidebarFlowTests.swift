@@ -187,7 +187,7 @@ struct SidebarFlowTests {
         #expect(model.draft == "foo n")  // identifier boundary protected
     }
 
-    @Test("Actions-tab insert is the plain draft replacement (previewable before Return)")
+    @Test("Actions-tab context-menu insert is the plain draft replacement")
     func insertActionCommandReplacesDraft() {
         let model = ShellModel()
         model.draft = "old"

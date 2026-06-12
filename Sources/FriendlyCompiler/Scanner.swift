@@ -2,8 +2,8 @@
 //
 // Per the spec, we do not build a full expression parser. We only need enough
 // structure to (a) validate balanced parens/brackets and (b) split a payload on
-// top-level commas (commas not nested inside (), [], {}). Expression payloads
-// are otherwise passed through verbatim.
+// top-level delimiters (not nested inside (), [], {}). Expression payloads are
+// otherwise passed through verbatim.
 
 import Foundation
 
@@ -50,9 +50,19 @@ enum Scanner {
         return nil
     }
 
-    /// Split `s` on top-level commas (depth 0 w.r.t. (), [], {}), trimming each
-    /// piece. Assumes `s` is already balanced (call `balanceError` first).
     static func splitTopLevelCommas(_ s: String) -> [String] {
+        splitTopLevel(s, delimiter: ",")
+    }
+
+    /// Split `s` on top-level semicolons (depth 0 w.r.t. (), [], {}), trimming
+    /// each piece. Assumes `s` is already balanced (call `balanceError` first).
+    static func splitTopLevelSemicolons(_ s: String) -> [String] {
+        splitTopLevel(s, delimiter: ";")
+    }
+
+    /// Split `s` on a top-level delimiter (depth 0 w.r.t. (), [], {}), trimming
+    /// each piece. Assumes `s` is already balanced (call `balanceError` first).
+    private static func splitTopLevel(_ s: String, delimiter: Character) -> [String] {
         var parts: [String] = []
         var depth = 0
         var current = ""
@@ -63,7 +73,7 @@ enum Scanner {
             } else if closers.contains(ch) {
                 depth -= 1
                 current.append(ch)
-            } else if ch == "," && depth == 0 {
+            } else if ch == delimiter && depth == 0 {
                 parts.append(current.trimmedShim)
                 current = ""
             } else {

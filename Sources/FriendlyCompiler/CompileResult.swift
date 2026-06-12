@@ -10,8 +10,10 @@ import Foundation
 public enum CompileResult: Equatable, Sendable {
     /// Input matched a friendly command form and was rewritten to Sage source.
     ///
-    /// - `generatedSage`: a **single Sage expression** the UI can display verbatim
-    ///   ("Generated Sage") and the worker can `eval`.
+    /// - `generatedSage`: Sage source the UI can display verbatim ("Generated
+    ///   Sage") and the worker can `eval`. Most forms are a single expression;
+    ///   simple assignments use `name = value\nname` so the tape echoes the
+    ///   assigned value.
     /// - `requiredVariables`: free variables the expression needs declared in the
     ///   session (e.g. `x` for `integral x^2`). V1.4 decides how to satisfy these
     ///   (emit `var('x')` preludes, or rely on the session). See the README /

@@ -56,9 +56,11 @@ passed through structurally (we never reflow the user's math).
 | limit | `limit EXPR, V->P` | `limit(EXPR, V=P)` |
 | taylor | `taylor EXPR, V=P, order=N` | `taylor(EXPR, V, P, N)` |
 | plot | `plot EXPR, V=A..B` | `plot(EXPR, (V, A, B))` |
-| matrix | `matrix [[…]]` | `matrix([[…]])` |
-| eigenvalues | `eigenvalues [[…]]` | `matrix([[…]]).eigenvalues()` |
-| rref | `rref [[…]]` | `matrix([[…]]).rref()` |
+| matrix | `matrix [[…]]` or `matrix [1,2; 3,4]` | `matrix([[…]])` |
+| eigenvalues | `eigenvalues [[…]]` or `eigenvalues [1,2; 3,4]` | `matrix([[…]]).eigenvalues()` |
+| rref | `rref [[…]]` or `rref [1,2; 3,4]` | `matrix([[…]]).rref()` |
+| assignment echo | `A = EXPR` | `A = EXPR` + final `A` echo |
+| matrix shorthand | `[1,2; 3,4]` or `A = [1,2; 3,4]` | `matrix([[1,2],[3,4]])` or `A = matrix([[1,2],[3,4]])` + final `A` echo |
 
 **Synonyms:** `diff`→derivative, `integrate`→integral, `double integrate`→double
 integral, `eigenvalue`→eigenvalues.
@@ -80,6 +82,22 @@ rewritten. **Verified end-to-end to evaluate to `1/8`.**
 Top-level commas split clauses (commas inside `()[]{}` don't split), so a matrix
 or a function with multiple args inside the integrand survives.
 
+**Matrix literals.** Matrix commands accept the original Sage row-list payload
+(`[[1,2],[3,4]]`) and MATLAB-style single-bracket payloads (`[1, 2, 3; 2, 3, 4]`).
+MATLAB-style rows split on top-level semicolons and cells split on top-level
+commas, then compile to Sage's list-of-rows form:
+`matrix [1, 2, 3 ; 2, 3, 4 ]` → `matrix([[1,2,3],[2,3,4]])`.
+
+The shim also recognizes a bare MATLAB-style matrix literal and simple
+identifier assignments. Assignments compile as a statement followed by the
+assigned name as the final expression, so the worker mutates the namespace and
+the tape renders the assigned value in the same row:
+`A = matrix([[1,2],[3,4]])` → `A = matrix([[1,2],[3,4]])\nA`.
+
+For MATLAB-style matrices:
+`[1,2; 3,4]` → `matrix([[1,2],[3,4]])`, and
+`A = [1,2; 3,4]` → `A = matrix([[1,2],[3,4]])\nA`.
+
 ---
 
 ## Bypass rule
@@ -94,7 +112,8 @@ or a function with multiple args inside the integrand survives.
 | `factor(x^4-1)` | **bypass** | already function-call syntax (`(` not space) |
 | `factorial(5)` | **bypass** | starts with `factor` but no space boundary |
 | `2+2`, `sin(pi/3)` | **bypass** | no leading command word |
-| `A = matrix([[1,2],[3,4]])` | **bypass** | starts with `A`, not a command |
+| `A = matrix([[1,2],[3,4]])` | friendly assignment echo | simple assignment; tape renders `A` |
+| `A = [1,2; 3,4]` | friendly assignment echo | MATLAB-style matrix assignment; tape renders `A` |
 | `x.diff()` | **bypass** | starts with `x` |
 | `foobar x^2` | **bypass** | unknown leading word |
 | `""` (empty) | **bypass** (`""`) | nothing to do |
@@ -108,8 +127,10 @@ user can paste arbitrary Sage and it flows straight through.
 ## Variable policy
 
 **The compiler reports required variables; it never injects declarations.** The
-`generatedSage` is always a single clean expression suitable for "Generated Sage"
-display.
+`generatedSage` is usually a single clean expression suitable for "Generated
+Sage" display. The exception is a simple assignment, which appends a final line
+containing the assigned variable so the worker returns the assigned value for
+the tape.
 
 `requiredVariables` is inferred by scanning the expression for **bare identifiers
 not followed by `(`** (excludes function calls), **not reserved** (constants
