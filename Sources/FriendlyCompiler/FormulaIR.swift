@@ -18,6 +18,7 @@ public enum FormulaIR: Equatable, Sendable {
     case plot(PlotFormulaIR)
     case implicitPlot(ImplicitPlotFormulaIR)
     case parametricPlot(ParametricPlotFormulaIR)
+    case matrixOp(MatrixFormulaIR)
 
     public static func parse(_ draft: String) -> FormulaIR? {
         // Families are keyed by disjoint leading commands, so order is cosmetic.
@@ -31,6 +32,7 @@ public enum FormulaIR: Equatable, Sendable {
         if let ir = ImplicitPlotFormulaIR.parse(draft) { return .implicitPlot(ir) }
         if let ir = ParametricPlotFormulaIR.parse(draft) { return .parametricPlot(ir) }
         if let ir = PlotFormulaIR.parse(draft) { return .plot(ir) }
+        if let ir = MatrixFormulaIR.parse(draft) { return .matrixOp(ir) }
         return nil
     }
 
@@ -46,6 +48,7 @@ public enum FormulaIR: Equatable, Sendable {
         case let .plot(ir): return ir.friendlyInput
         case let .implicitPlot(ir): return ir.friendlyInput
         case let .parametricPlot(ir): return ir.friendlyInput
+        case let .matrixOp(ir): return ir.friendlyInput
         }
     }
 }

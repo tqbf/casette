@@ -76,8 +76,14 @@ public enum FriendlyCompiler {
         case .sum:          return seriesRange(rest, sage: "sum", command: "sum")
         case .product:      return seriesRange(rest, sage: "product", command: "product")
         case .matrix:       return matrixForm(rest)
+        case .vector:       return vectorForm(rest)
         case .eigenvalues:  return matrixMethod(rest, method: "eigenvalues")
         case .rref:         return matrixMethod(rest, method: "rref")
+        case .det:          return matrixMethod(rest, method: "det")
+        case .inverse:      return matrixMethod(rest, method: "inverse")
+        case .transpose:    return matrixMethod(rest, method: "transpose")
+        case .rank:         return matrixMethod(rest, method: "rank")
+        case .eigenvectors: return matrixMethod(rest, method: "eigenvectors_right")
         }
     }
 
@@ -88,7 +94,8 @@ public enum FriendlyCompiler {
         case integral, doubleIntegral, limit, taylor, plot
         case implicitPlot, parametricPlot
         case sum, product
-        case matrix, eigenvalues, rref
+        case matrix, vector, eigenvalues, rref
+        case det, inverse, transpose, rank, eigenvectors
 
         /// The phrase(s) that introduce this command. Multi-word first so the
         /// matcher prefers "double integral" over "integral".
@@ -109,8 +116,14 @@ public enum FriendlyCompiler {
             case .sum: return ["sum"]
             case .product: return ["product"]
             case .matrix: return ["matrix"]
+            case .vector: return ["vector"]
             case .eigenvalues: return ["eigenvalues", "eigenvalue"]
             case .rref: return ["rref"]
+            case .det: return ["det", "determinant"]
+            case .inverse: return ["inverse"]
+            case .transpose: return ["transpose"]
+            case .rank: return ["rank"]
+            case .eigenvectors: return ["eigenvectors", "eigenvector"]
             }
         }
 
@@ -133,8 +146,14 @@ public enum FriendlyCompiler {
             case .sum: return "Try: sum k^2, k=1..n"
             case .product: return "Try: product 1 + 1/k, k=1..n"
             case .matrix: return "Try: matrix [1,2; 3,4]"
+            case .vector: return "Try: vector [1,2,3]"
             case .eigenvalues: return "Try: eigenvalues [1,2; 3,4]"
             case .rref: return "Try: rref [1,2; 3,4]"
+            case .det: return "Try: det [1,2; 3,4]"
+            case .inverse: return "Try: inverse [1,2; 3,4]"
+            case .transpose: return "Try: transpose [1,2; 3,4]"
+            case .rank: return "Try: rank [1,2; 3,4]"
+            case .eigenvectors: return "Try: eigenvectors [1,2; 3,4]"
             }
         }
     }
@@ -698,14 +717,46 @@ public enum FriendlyCompiler {
         return .success(generatedSage: "matrix(\(body))", requiredVariables: [])
     }
 
+    /// A matrix method like `det`/`eigenvalues`/`rref`. Two payload shapes:
+    ///
+    ///   * A bracketed literal (`[1,2; 3,4]` or `[[1,2],[3,4]]`) normalizes into
+    ///     Sage's row-list form and binds the method to a fresh `matrix(...)`:
+    ///     `matrix([[1,2],[3,4]]).det()`. (The frozen V0.7 contract.)
+    ///   * Anything else — a variable `A`, an expression `A*B`, or a tape ref
+    ///     already expanded to `__casette_tape_refs[3]` — is an existing matrix
+    ///     value: it binds directly, parenthesized, with its free variables
+    ///     reported: `(A).det()`. A `#ROW` reference reaches us already expanded
+    ///     to an identifier-shaped `__casette_tape_refs[N]` (starts with `_`,
+    ///     not `[`), so it takes this path naturally — no `#` special-case.
     private static func matrixMethod(_ payload: String, method: String) -> CompileResult {
-        guard let body = normalizeMatrixPayload(payload) else {
+        let body = payload.trimmedShim
+        if body.hasPrefix("[") {
+            guard let normalized = normalizeMatrixPayload(body) else {
+                return .error(CompileError(
+                    message: "`\(method)` needs a bracketed list of rows.",
+                    suggestion: "Try: \(method) [1,2; 3,4]"
+                ))
+            }
+            return .success(generatedSage: "matrix(\(normalized)).\(method)()", requiredVariables: [])
+        }
+        return .success(
+            generatedSage: "(\(body)).\(method)()",
+            requiredVariables: Variables.freeVariables(in: body))
+    }
+
+    private static func vectorForm(_ payload: String) -> CompileResult {
+        // A vector is a flat bracketed list (`[1,2,3]`) — it passes through
+        // verbatim inside the call (no row normalization; vectors aren't nested).
+        let body = payload.trimmedShim
+        guard body.hasPrefix("["), body.hasSuffix("]"), singleOuterBracketBody(body) != nil else {
             return .error(CompileError(
-                message: "`\(method)` needs a bracketed list of rows.",
-                suggestion: "Try: \(method) [1,2; 3,4]"
+                message: "`vector` needs a bracketed list of entries.",
+                suggestion: "Try: vector [1,2,3]"
             ))
         }
-        return .success(generatedSage: "matrix(\(body)).\(method)()", requiredVariables: [])
+        return .success(
+            generatedSage: "vector(\(body))",
+            requiredVariables: Variables.freeVariables(in: body))
     }
 
     private static func matlabMatrixShorthand(_ input: String) -> CompileResult? {

@@ -31,6 +31,8 @@ struct FormulaBarView: View {
             ImplicitPlotFormulaBar(model: model, formula: ir)
         case let .parametricPlot(ir):
             ParametricPlotFormulaBar(model: model, formula: ir)
+        case let .matrixOp(ir):
+            MatrixFormulaBar(model: model, formula: ir)
         }
     }
 }

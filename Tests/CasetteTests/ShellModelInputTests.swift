@@ -430,6 +430,43 @@ struct ShellModelInputTests {
             "implicit_plot(x^2 + y^2 == 1, (x, -2, 2), (y, -2, 2))"))
     }
 
+    @Test("matrix formula bar model rewrites friendly IR with a filled payload")
+    func matrixFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "det"
+        guard case let .matrixOp(formula0) = model.formulaIR, formula0.kind == .det else {
+            Issue.record("expected matrixOp(det) formula")
+            return
+        }
+        #expect(formula0.payload.isEmpty)
+
+        var formula = formula0
+        formula.payload = "[1,2; 3,4]"
+        model.updateFormula(.matrixOp(formula))
+        #expect(model.draft == "det [1,2; 3,4]")
+        #expect(model.matrixFormula?.payload == "[1,2; 3,4]")
+        #expect(model.draftPreview == .generated("matrix([[1,2],[3,4]]).det()"))
+    }
+
+    @Test("matrix formula bar resolves a tape reference at the compile boundary")
+    func matrixFormulaTapeReferenceCompiles() {
+        let rows = [
+            SessionRow(
+                input: "matrix([[1,2],[3,4]])", sage: "matrix([[1,2],[3,4]])",
+                result: PersistedEnvelope(kind: "matrix", plain: "[1 2]\n[3 4]"),
+                status: .ok, timestamp: .now
+            ),
+        ]
+        let model = ShellModel(rows: rows)
+        #expect(model.tapeReferences.entries.keys.sorted() == [1])
+
+        model.draft = "det #1"
+        #expect(model.matrixFormula?.payload == "#1")
+        // CompiledInput expands `#1` to the identifier-shaped tape ref, which the
+        // generalized matrix-method path treats as a value (not a literal).
+        #expect(model.draftPreview == .generated("(__casette_tape_refs[1]).det()"))
+    }
+
     @Test("tape references use visible row numbers but only successful reusable rows are valid")
     func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
         let rows = [
