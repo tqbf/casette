@@ -6,6 +6,9 @@ import SwiftUI
 /// the evaluation metadata (duration, time).
 struct InspectorTabView: View {
     let row: SessionRow?
+    /// The row's V1.9 provenance mark (cached/replayed), nil for a fresh
+    /// row — fresh is the default and shows no "Source" field (no noise).
+    var provenanceMark: RowProvenanceMark?
 
     var body: some View {
         if let row {
@@ -65,6 +68,24 @@ struct InspectorTabView: View {
                         LabeledContent("Status", value: "Not evaluated")
                     }
                 }
+                // A replay that DIFFERED retains the prior cached envelope
+                // (the V0.10 supersede policy: replace + keep + reason) —
+                // shown so the difference is visible in the UI, not just
+                // the data model.
+                if let superseded = row.supersededCache {
+                    Section("Superseded Result") {
+                        LabeledContent("Reason", value: superseded.reason)
+                        if !superseded.envelope.plain.isEmpty {
+                            InspectorMonoField(
+                                label: "Previous", value: superseded.envelope.plain)
+                        }
+                        if let cachedAt = superseded.cachedAt {
+                            LabeledContent("Cached") {
+                                Text(cachedAt, format: .dateTime)
+                            }
+                        }
+                    }
+                }
                 if let artifacts = row.result?.artifacts, !artifacts.isEmpty {
                     Section("Artifacts") {
                         // Artifacts have no stable identity of their own
@@ -80,6 +101,14 @@ struct InspectorTabView: View {
                     InspectorMonoField(label: "Generated Sage", value: row.sage)
                 }
                 Section("Evaluation") {
+                    if let provenanceMark {
+                        LabeledContent("Source", value: provenanceMark.inspectorDescription)
+                    }
+                    if let replayedAt = row.provenance.replayedAt {
+                        LabeledContent("Replayed") {
+                            Text(replayedAt, format: .dateTime)
+                        }
+                    }
                     if let duration = row.duration {
                         LabeledContent(
                             "Duration",

@@ -280,6 +280,44 @@ strict decoding would also fail.
   path since saves are atomic+incremental), and expose the optional
   "replay session" command via `WorkerDriver.replay`. "Missing Sage path opens
   Sage Doctor" is the v0/09 boundary, not this one.
+
+  > **V1.9 landed (2026-06-12) — how the lift actually integrated** (schema
+  > untouched, still v1; the three additive fields needed zero store changes
+  > because they're omitted-when-nil Codable):
+  > - `SessionStore` lives at `Sources/Casette/Persistence/SessionStore.swift`,
+  >   near-verbatim. ONE deviation: `defaultSessionsDirectory(environment:)`
+  >   takes the environment as a parameter (production call site passes the
+  >   process env) so app tests inject the `CASETTE_CONFIG_DIR` override
+  >   instead of racing `setenv` (PROBLEMS.md parallel-test rule).
+  > - `ShellModel` saves synchronously after every `append`/`complete`/
+  >   `edit`/`toggleExpanded`/`setPrecision`/replayed row. There is NO
+  >   quit-time save — the per-row saves ARE crash recovery (proven by
+  >   kill -9 + relaunch).
+  > - **`refusedSchema` also disables SAVING for the run** (not just loading):
+  >   a session written by a newer app must never be clobbered by this one's
+  >   first row.
+  > - A restored `running` row (persisted mid-eval — the crash case) flips to
+  >   `interrupted` with a synthetic "Casette quit before this evaluation
+  >   finished" envelope at restore: nothing will ever complete it, and an
+  >   eternal spinner would be a lie. The flip is re-persisted.
+  > - **Replay** (`ShellModel.replaySession`, Sage ▸ Replay Session) restarts
+  >   the worker (fresh namespace, V0.10 semantics) and re-sends the whole
+  >   tape in order as ONE serial-queue item; preludes are recompiled per row
+  >   (`SessionReplay.preludes` — ambiguous inputs use their recorded
+  >   resolution); a **numeric row replays with `numeric:true`** (the V1.8
+  >   note honored — the request shape, not just the `sage`); the supersede
+  >   policy is `SessionReplay.difference`, ported verbatim (paths never
+  >   compared).
+  > - **Cached-vs-replayed marking is transient presentation:** the persisted
+  >   `Provenance` records a fresh eval as `cached` (that's what a restore
+  >   loads), so "restored this run" lives in a transient
+  >   `ShellModel.restoredRowIDs` set; the quiet per-row tag
+  >   (`RowProvenanceMark`) derives from membership + provenance kind. Fresh
+  >   rows show nothing.
+  > - `sageVersion` stays nil in app-written files for now: the worker's
+  >   ready banner carries only the pid, and the field is informational. A
+  >   future phase (V1.10 has the version handy) can start filling it —
+  >   additive, no schema change.
 - **Unify the duplicated worker driver.** `WorkerProcess.swift` + `LineReader.swift`
   here are **copied verbatim** from `v0/09-sage-doctor` (frozen evidence — do not
   refactor v0/09). V1 should pull these into **one** `SageKernel` that both the

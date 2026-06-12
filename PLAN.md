@@ -56,6 +56,44 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.9 done (live gate PASSED, all 11 checks) — the app feels persistent
+without becoming document-oriented.** Quit/relaunch restores the visible tape from ONE
+pretty-printed `last-session.json` (`~/Library/Application
+Support/Casette/sessions/`, `$CASETTE_CONFIG_DIR` override); `SessionStore`
+is lifted near-verbatim from v0/10 (the V1.2 types were lifted for exactly
+this; the three additive fields are omitted-when-nil, schema stays **v1**;
+one deviation: env-injectable default directory so tests never `setenv`).
+Saves are atomic temp-write+rename after EVERY row/header mutation through
+one `ShellModel.persist()` funnel — there is NO quit-time save; the per-row
+saves ARE crash recovery (proven live: kill -9 mid-session → relaunch
+restores everything up to the last completed row; no stray processes —
+the worker exits on stdin EOF). Restore runs BEFORE the kernel connects:
+the tape renders from persisted envelopes with Sage genuinely not involved
+(missing plot artifacts show V1.7's honest box — its designed moment), so a
+missing-Sage launch still restores read-only under the existing banner
+(V1.10's Doctor hook). Robust load: corrupt → quarantine + fresh; **newer
+schema → refuse AND disable saving for the run** (never clobber the
+future); stale `running` rows flip to honest `interrupted`. **Sage ▸ Replay
+Session** restarts the worker and re-sends the whole tape in order (state-
+dependent rows work; numeric rows replay with their recorded `numeric:true`
+request shape; preludes recompiled; a differing replay supersedes —
+replace + keep + reason — comparing kind/plain/latex/approx + artifact
+FORMAT set, never paths). Cached-vs-replayed is marked QUIETLY per row
+(meta-scale tertiary tag + tooltip; transient `restoredRowIDs` because the
+persisted provenance records fresh evals as `cached`); the Inspector gains
+Source / Replayed / Superseded Result. UI layout persists: sidebar
+visibility + tab via `@AppStorage` (`UILayout`; the V1.1 "don't persist the
+tab" call deliberately revisited — the spec wins), window frame via the
+system's WindowGroup autosave (verified live). Sage path reuse via
+sage-doctor.json confirmed + pinned by test. `make check` / **`make test`
+278/278** (+29: store ×10, replay logic ×5, persistence flows ×9 incl.
+restore-with-ZERO-spawns and replay wire order, UI layout ×3, config
+round-trip +1, real-Sage record→restore→replay journey ×1) / `make build`
+green; full V0 regression clean (exact counts in PROGRESS.md); scripted
+live gate green (restore/replay/crash/layout all verified on screen).
+**On-screen verifier checklist (12 items) in PROGRESS.md — pending.**
+**Next: V1.10 — Sage Doctor in app** (after the V1.9 live gate passes).
+
 **V1.8 done (live gate PASSED, all 14 checks; round-1's "tab bar opens Time
 Machine" was a verifier-side overlapping System Settings window, proven in
 round 2) — exactness is a product feature.** The

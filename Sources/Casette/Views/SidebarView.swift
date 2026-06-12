@@ -31,7 +31,9 @@ struct SidebarView: View {
             case .history:
                 HistoryTabView(model: model, focusInput: focusInput)
             case .inspector:
-                InspectorTabView(row: model.selectedRow)
+                InspectorTabView(
+                    row: model.selectedRow,
+                    provenanceMark: model.selectedRow.flatMap { model.provenanceMark(for: $0) })
             case .actions:
                 ActionsTabView(model: model, row: model.selectedRow, focusInput: focusInput)
             }

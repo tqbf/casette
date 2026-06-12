@@ -23,6 +23,7 @@ struct SessionTapeView: View {
                                 row: row,
                                 isSelected: model.selectedRowID == row.id,
                                 isKernelConnected: model.kernelState.isConnected,
+                                provenanceMark: model.provenanceMark(for: row),
                                 onSelect: { model.select(row.id) },
                                 onToggleExpanded: { model.toggleExpanded(rowID: row.id) },
                                 onRerun: { model.rerun(rowID: row.id) },

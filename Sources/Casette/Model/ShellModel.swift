@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// The view-facing seam over the live session: one `Session` (the real V1.2
 /// model, lifted from v0/10), the latest `SymbolSnapshot`, the kernel state,
@@ -71,11 +72,28 @@ final class ShellModel {
     var numericMode = false
     /// Command history (the session's submitted inputs) behind Up/Down.
     private(set) var inputHistory = InputHistory()
+    /// True while Replay Session is re-sending the tape (disables the menu
+    /// command; the replay itself rides the serial kernel queue).
+    private(set) var isReplaying = false
+    /// The IDs of rows that arrived via restore THIS run — the transient
+    /// state behind the quiet per-row provenance mark (`RowProvenanceMark`):
+    /// the persisted `Provenance` records a fresh eval as `cached` (that is
+    /// what a later restore loads), so "loaded from disk" vs "evaluated just
+    /// now" is only knowable here. Never persisted.
+    private(set) var restoredRowIDs: Set<SessionRow.ID> = []
 
     /// True while a history recall is writing the draft, so `draft.didSet`
     /// can tell a recall apart from a user edit.
     @ObservationIgnored private var isRecallingHistory = false
 
+    /// The persistence engine (V1.9). nil = no persistence: previews and
+    /// pure-model tests construct `ShellModel()` and never touch disk; the
+    /// real app attaches a store via `restoreLastSession(from:)`. Also
+    /// nil-ed deliberately when load refuses a NEWER schema — saving would
+    /// clobber a file a future app version can still read.
+    @ObservationIgnored private var store: SessionStore?
+    @ObservationIgnored private let logger = Logger(
+        subsystem: "org.sockpuppet.casette", category: "persistence")
     private var controller: SessionController?
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     /// The serial evaluation queue: each enqueued work item awaits the
@@ -98,6 +116,79 @@ final class ShellModel {
 
     /// Prior inputs, newest first, for the History tab.
     var historyRows: [SessionRow] { session.rows.reversed() }
+
+    // MARK: - Persistence (V1.9)
+
+    /// Attaches the session store and restores the last session, BEFORE the
+    /// kernel connects — restore needs no worker (the V0.10 guarantee: rows
+    /// render from their persisted envelopes with Sage genuinely not
+    /// spawned), so a machine with no Sage still gets its tape back,
+    /// read-only, under the honest kernel banner (V1.10 puts the full Doctor
+    /// behind that banner).
+    ///
+    /// Outcome handling per SESSION-FORMAT.md:
+    ///   * restored — adopt the session (artifact liveness already
+    ///     re-resolved by `load()`; a restored plot's PNG is essentially
+    ///     always `missing` — V1.7's honest box renders it). Rows persisted
+    ///     mid-eval (`running` — the crash case) flip to `interrupted` with
+    ///     a readable synthetic result: nothing will ever complete them, and
+    ///     an eternal spinner would be a lie.
+    ///   * fresh — first launch / no file; nothing to do.
+    ///   * corruptQuarantined — the bad file was moved aside; start fresh
+    ///     (saving continues — the quarantine IS the recovery).
+    ///   * refusedSchema — a NEWER app wrote that file; start fresh and
+    ///     DISABLE saving so this run never clobbers the future.
+    func restoreLastSession(from store: SessionStore) {
+        self.store = store
+        switch store.load() {
+        case .restored(var restored):
+            for index in restored.rows.indices where restored.rows[index].status == .running {
+                let message = "Casette quit before this evaluation finished."
+                restored.rows[index].status = .interrupted
+                restored.rows[index].result = PersistedEnvelope(
+                    kind: "error",
+                    plain: message,
+                    error: PersistedError(type: "Interrupted", message: message))
+            }
+            session = restored
+            restoredRowIDs = Set(restored.rows.map(\.id))
+            for row in restored.rows {
+                inputHistory.record(row.input)
+            }
+            logger.info("restored \(restored.rows.count) row(s) from the last session")
+            persist()  // re-resolved liveness + any flipped rows, on disk now
+        case .fresh:
+            break
+        case let .corruptQuarantined(quarantinePath, detail):
+            logger.error(
+                "last-session.json was corrupt — quarantined to \(quarantinePath, privacy: .public): \(detail, privacy: .public)")
+        case let .refusedSchema(found, supported):
+            self.store = nil
+            logger.warning(
+                "last-session.json has schema \(found) (this app supports \(supported)) — leaving it intact; persistence is off for this run")
+        }
+    }
+
+    /// The quiet provenance mark a row's card shows, or nil for a row
+    /// evaluated fresh this run (the normal case shows nothing).
+    func provenanceMark(for row: SessionRow) -> RowProvenanceMark? {
+        guard restoredRowIDs.contains(row.id) else { return nil }
+        return row.provenance.kind == .replayed ? .replayed : .cached
+    }
+
+    /// Saves the session atomically (temp-write + rename — the V0.10
+    /// pattern), called after EVERY row mutation and header change, so a
+    /// crash at any moment leaves a complete file up to the last completed
+    /// row. A save failure is logged, never fatal — persistence must not
+    /// take the calculator down.
+    private func persist() {
+        guard let store else { return }
+        do {
+            try store.save(session)
+        } catch {
+            logger.error("session save failed: \(String(describing: error), privacy: .public)")
+        }
+    }
 
     // MARK: - Kernel
 
@@ -143,6 +234,7 @@ final class ShellModel {
         guard digits > 0, digits != session.precisionDigits else { return }
         session.precisionDigits = digits
         session.updated = .now
+        persist()  // a header change is a session change (V1.9)
         guard let controller else { return }
         enqueueKernelWork {
             _ = await controller.configure(precisionDigits: digits)
@@ -210,6 +302,82 @@ final class ShellModel {
             }
             await self?.refreshSymbols()
         }
+    }
+
+    /// Whether Replay Session can act right now: a connected kernel (a
+    /// replay against no worker would clobber every cached result with
+    /// "Sage isn't running" errors), rows to replay, and no replay already
+    /// in flight.
+    var canReplaySession: Bool {
+        controller != nil && kernelState.isConnected && !isReplaying && !session.rows.isEmpty
+    }
+
+    /// The V1.9 "Replay Session" command: restarts the worker (replay is
+    /// defined against a FRESH namespace — V0.10 semantics) and re-sends
+    /// each row's `sage` in tape order, so state-dependent rows
+    /// (`A = matrix(...)` then `A.eigenvalues()`) succeed. Per row:
+    ///   * required-variable preludes are re-emitted (`SessionReplay.preludes`,
+    ///     the same policy submission uses);
+    ///   * a NUMERIC row replays with its recorded `numeric` flag — replay
+    ///     re-sends the REQUEST shape, not just the `sage`, so the restored
+    ///     display matches what the user originally saw (SESSION-FORMAT.md
+    ///     V1.8 note);
+    ///   * provenance flips `cached → replayed` (original `cachedAt` kept);
+    ///   * a DIFFERING result supersedes the cached envelope into
+    ///     `supersededCache` (replace + keep + reason; artifact paths are
+    ///     never compared — V0.10 policy);
+    ///   * the file is re-saved after every replayed row (incremental).
+    ///
+    /// The whole replay is ONE serial-queue item, so a submission typed
+    /// during a replay evaluates after it, in the replayed namespace.
+    func replaySession() {
+        guard let controller, canReplaySession else { return }
+        isReplaying = true
+        let rows = session.rows
+        let restart = Task { await controller.restart() }
+        enqueueKernelWork { [weak self] in
+            defer { self?.isReplaying = false }
+            await restart.value
+            _ = await controller.evaluate(Self.bootPrelude)
+            if let digits = self?.precisionNeedingReapply {
+                _ = await controller.configure(precisionDigits: digits)
+            }
+            for row in rows {
+                for prelude in SessionReplay.preludes(for: row) {
+                    _ = await controller.evaluate(prelude)
+                }
+                let evaluation = await controller.evaluate(
+                    row.sage, numeric: row.numeric == true)
+                self?.applyReplay(rowID: row.id, with: evaluation)
+            }
+            await self?.refreshSymbols()
+        }
+    }
+
+    /// Applies one replayed outcome to its row: the new result becomes
+    /// current with `.replayed` provenance; a differing cached envelope is
+    /// retained in `supersededCache` (the V0.10 supersede policy, verbatim
+    /// from `WorkerDriver.replay`).
+    func applyReplay(rowID: SessionRow.ID, with evaluation: Evaluation, at date: Date = .now) {
+        guard let index = session.rows.firstIndex(where: { $0.id == rowID }) else { return }
+        var row = session.rows[index]
+        if let cached = row.result, let replayed = evaluation.result,
+           let reason = SessionReplay.difference(cached: cached, replayed: replayed) {
+            row.supersededCache = SupersededCache(
+                envelope: cached,
+                cachedAt: row.provenance.cachedAt,
+                reason: reason)
+        }
+        row.result = evaluation.result
+        row.status = evaluation.status
+        row.durationSeconds = evaluation.duration
+        row.provenance = Provenance(
+            kind: .replayed,
+            cachedAt: row.provenance.cachedAt,
+            replayedAt: date)
+        session.rows[index] = row
+        session.updated = date
+        persist()
     }
 
     /// Asks the in-flight evaluation to stop (SIGINT, escalating to a hard
@@ -495,6 +663,7 @@ final class ShellModel {
         )
         session.rows.append(row)
         session.updated = date
+        persist()  // a crash now restores the row as honestly incomplete
         return row.id
     }
 
@@ -504,6 +673,7 @@ final class ShellModel {
         guard let index = session.rows.firstIndex(where: { $0.id == rowID }) else { return }
         session.rows[index].apply(evaluation, at: date)
         session.updated = date
+        persist()  // incremental save after EVERY completed row (V1.9)
     }
 
     /// Edits a row's input in place. Identity and timestamp are stable; the
@@ -522,6 +692,8 @@ final class ShellModel {
         session.rows[index].status = .running
         session.rows[index].durationSeconds = nil
         session.updated = .now
+        restoredRowIDs.remove(rowID)  // its restored content is gone
+        persist()
     }
 
     /// Flips a row's expanded/collapsed state (the V1.2 row field; V1.5's
@@ -529,6 +701,7 @@ final class ShellModel {
     func toggleExpanded(rowID: SessionRow.ID) {
         guard let index = session.rows.firstIndex(where: { $0.id == rowID }) else { return }
         session.rows[index].expanded.toggle()
+        persist()  // `expanded` is the one persisted UI-state field
     }
 
     func select(_ rowID: SessionRow.ID?) {

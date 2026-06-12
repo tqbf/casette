@@ -56,4 +56,32 @@ struct KernelSetupTests {
         #expect(message.contains("Homebrew"))
         #expect(message.contains("sage-doctor.json"))
     }
+
+    @Test("the remembered Sage path round-trips through sage-doctor.json and wins discovery (the V1.9 'remember Sage path' criterion)")
+    func rememberedSagePathIsReusedAtLaunch() throws {
+        // Hermetic: the store reads its directory from an INJECTED
+        // environment (no setenv — PROBLEMS.md parallel-test rule).
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "casette-sage-config-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SageConfigStore(
+            environment: ["CASETTE_CONFIG_DIR": directory.path])
+
+        // What the doctor/config stored…
+        try store.store(sagePath: "/remembered/sage")
+        // …a "relaunch" (a fresh store over the same file) reads back…
+        let relaunched = SageConfigStore(
+            environment: ["CASETTE_CONFIG_DIR": directory.path])
+        #expect(relaunched.storedPath() == "/remembered/sage")
+
+        // …and discovery — the exact call `discoveringTransportFactory`
+        // makes at boot — selects it first.
+        let discovery = SageDiscovery(
+            existenceCheck: { _ in true },
+            pathLookup: { nil },
+            appBundleGlob: { [] })
+        let result = discovery.discover(storedPath: relaunched.storedPath())
+        #expect(result.selected?.path == "/remembered/sage")
+        #expect(result.selected?.source == .stored)
+    }
 }

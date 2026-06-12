@@ -11,6 +11,11 @@ struct TapeRowView: View {
     let row: SessionRow
     let isSelected: Bool
     let isKernelConnected: Bool
+    /// The quiet V1.9 provenance tag ("cached" / "replayed") for rows whose
+    /// result didn't come from a fresh evaluation this run; nil (nothing
+    /// shown) for the normal fresh row. Derived by the model — see
+    /// `RowProvenanceMark`.
+    var provenanceMark: RowProvenanceMark?
     let onSelect: () -> Void
     let onToggleExpanded: () -> Void
     /// Re-evaluates this row's input as a fresh tape row (the plot card's
@@ -55,6 +60,18 @@ struct TapeRowView: View {
                     .allowsHitTesting(isHovered)
                     .animation(.easeOut(duration: 0.12), value: isHovered)
                     .help("Copy result")
+                // The V1.9 provenance tag — deliberately QUIET (timestamp
+                // styling): a restored tape shouldn't shout, but cached vs
+                // replayed must be visible where it matters (V0.10's call).
+                if let provenanceMark {
+                    Text(provenanceMark.label)
+                        .font(Theme.Fonts.meta)
+                        .foregroundStyle(.tertiary)
+                        .help(provenanceMark.help)
+                        // "cached" alone is cryptic to VoiceOver; speak the
+                        // full meaning (swiftui-pro finding).
+                        .accessibilityLabel(provenanceMark.help)
+                }
                 Text(row.timestamp, style: .time)
                     .font(Theme.Fonts.meta)
                     .foregroundStyle(.tertiary)

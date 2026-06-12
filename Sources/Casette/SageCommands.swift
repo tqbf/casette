@@ -48,6 +48,17 @@ struct SageCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(model == nil || model?.kernelState == .restarting)
+
+            // V1.9: re-evaluate the whole tape, in order, in a fresh worker
+            // (restored sessions get their live namespace back; provenance
+            // flips cached → replayed). Sits with Restart because it IS a
+            // restart plus the tape — and like the V1.8 controls it carries
+            // no shortcut yet (V1.12 certifies keys; PROBLEMS.md "never
+            // advertise a key unverified").
+            Button("Replay Session") {
+                model?.replaySession()
+            }
+            .disabled(model?.canReplaySession != true)
         }
     }
 }

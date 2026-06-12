@@ -10,10 +10,18 @@ import SwiftUI
 /// back to the input.
 struct RootView: View {
     @State private var model = ShellModel()
-    @State private var isSidebarPresented = true
+    /// Sidebar visibility persists across launches (V1.9 "remember UI
+    /// layout") — `@AppStorage` is the lightweight macOS idiom for it; the
+    /// projected binding drives `.inspector` and the ⌘B command unchanged.
+    @AppStorage(UILayout.sidebarVisibleKey) private var isSidebarPresented = true
+    /// The selected sidebar tab, persisted as its raw value. The live value
+    /// stays on `ShellModel` (sidebar flows switch tabs); this is just the
+    /// durable copy, synced both ways below.
+    @AppStorage(UILayout.sidebarTabKey) private var storedSidebarTab = SidebarTab.symbols.rawValue
     @FocusState private var isInputFocused: Bool
 
-    /// Previews pass false so opening a canvas never spawns a Sage process.
+    /// Previews pass false so opening a canvas never spawns a Sage process —
+    /// nor touches the real session file (restore is gated with the kernel).
     var connectsKernel = true
 
     var body: some View {
@@ -52,9 +60,17 @@ struct RootView: View {
         .focusedSceneValue(\.isSidebarPresented, $isSidebarPresented)
         .focusedSceneValue(\.shellModel, model)
         .defaultFocus($isInputFocused, true)
+        .onChange(of: model.sidebarTab) {
+            storedSidebarTab = model.sidebarTab.rawValue
+        }
         .task {
             isInputFocused = true
+            model.sidebarTab = UILayout.sidebarTab(fromStored: storedSidebarTab)
             if connectsKernel {
+                // Restore BEFORE the kernel connects: the tape renders from
+                // its persisted envelopes with Sage genuinely not involved,
+                // so it's there even when discovery fails (the banner case).
+                model.restoreLastSession(from: SessionStore())
                 model.connectKernel()
             }
         }
