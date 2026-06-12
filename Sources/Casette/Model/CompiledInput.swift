@@ -52,8 +52,11 @@ struct CompiledInput: Equatable, Sendable {
     /// Multiline input is raw Sage by definition: the friendly forms are
     /// single-line commands, and the V0.7 compiler (written for one line)
     /// flattens newlines — which would corrupt newline-sensitive raw Sage
-    /// statements. So anything containing a newline bypasses untouched.
-    static func compile(_ input: String) -> Outcome {
+    /// statements. So anything containing a newline bypasses untouched
+    /// (except smart-quote normalization, which applies to everything —
+    /// see `normalizingSmartQuotes`).
+    static func compile(_ rawInput: String) -> Outcome {
+        let input = normalizingSmartQuotes(rawInput)
         guard !input.contains("\n") else { return .ready(.bypass(input)) }
         switch FriendlyCompiler.compile(input) {
         case let .success(generatedSage, requiredVariables):
@@ -78,12 +81,35 @@ struct CompiledInput: Equatable, Sendable {
 
     /// A chosen `.ambiguous` candidate: the candidate string becomes the
     /// generated Sage, and its required variables are re-derived with the
-    /// library's own heuristic (candidates carry no variable report).
+    /// library's own heuristic (candidates carry no variable report). The
+    /// raw input is quote-normalized like every compiled input, so the row
+    /// always records what was actually evaluated.
     static func chosenCandidate(raw: String, sage: String) -> CompiledInput {
         CompiledInput(
-            raw: raw,
+            raw: normalizingSmartQuotes(raw),
             sage: sage,
             requiredVariables: FriendlyCompiler.freeVariables(in: sage),
             origin: .friendly)
+    }
+
+    // MARK: - Smart-quote normalization
+
+    /// Typographic ("curly") quotes mapped to their ASCII equivalents.
+    private static let smartQuotes: [Character: Character] = [
+        "\u{201C}": "\"", "\u{201D}": "\"",  // “ ” → "
+        "\u{2018}": "'", "\u{2019}": "'",    // ‘ ’ → '
+    ]
+
+    /// Replaces curly double/single quotes with their ASCII equivalents.
+    /// macOS smart-quote substitution and styled-text pastes turn
+    /// `print("hello")` into `print(\u{201C}hello\u{201D})`, which Python
+    /// rejects with a SyntaxError. Normalizing at the compile boundary —
+    /// before the bypass/friendly decision — means the recorded `raw` input
+    /// is exactly the text that was evaluated (honest), at the documented
+    /// cost that a pasted string literal CONTAINING curly quotes is altered
+    /// too. Acceptable for a calculator input field.
+    static func normalizingSmartQuotes(_ input: String) -> String {
+        guard input.contains(where: { smartQuotes[$0] != nil }) else { return input }
+        return String(input.map { smartQuotes[$0] ?? $0 })
     }
 }

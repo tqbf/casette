@@ -71,7 +71,72 @@ struct ShellModelKernelTests {
             model.submitDraft()
         }
         #expect(await eventually { @MainActor in model.rows.allSatisfy { $0.status == .ok } })
-        #expect(order.values == ["a = 1", "b = 2", "a + b"])
+        // The boot prelude (the REPL-matching var('x')) leads, then the
+        // submissions strictly in tape order.
+        #expect(order.values == [ShellModel.bootPrelude, "a = 1", "b = 2", "a + b"])
+    }
+
+    @Test("boot and restart each apply the var('x') prelude — the real-REPL contract")
+    func bootPreludeAppliedAtBootAndRestart() async {
+        let model = ShellModel()
+        let order = OrderRecorder()
+        // The factory mints a FRESH transport per generation (boot, restart),
+        // all recording into one shared order log.
+        let makeFake: @Sendable () -> FakeKernelTransport = {
+            let fake = FakeKernelTransport()
+            fake.respondToSend = { request in
+                guard let id = request["id"] as? String else { return [] }
+                if request["op"] as? String == "symbols" {
+                    return [WireFixtures.symbolsResponse(id: id, entries: [("x", "symbolic", "x")])]
+                }
+                order.record(request["code"] as? String ?? "?")
+                return [WireFixtures.okEnvelope(id: id, plain: "x", kind: "symbolic")]
+            }
+            return fake
+        }
+        model.connectKernel(SessionController(configuration: Self.fastConfig()) { makeFake() })
+
+        // Boot: the prelude is the FIRST eval, before any submission, and
+        // the sidebar refreshes — x is visible from boot, like the REPL.
+        #expect(await eventually { @MainActor in order.values == ["var('x')"] })
+        #expect(await eventually { @MainActor in model.symbols.entries.map(\.name) == ["x"] })
+
+        // Raw-Sage bypass (no friendly preludes) rides on the boot prelude.
+        model.draft = "expand((x+1)^8)"
+        model.submitDraft()
+        #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
+        #expect(order.values == ["var('x')", "expand((x+1)^8)"])
+
+        // Restart boots a fresh namespace — the prelude must be re-applied.
+        model.restartKernel()
+        #expect(await eventually { @MainActor in
+            order.values == ["var('x')", "expand((x+1)^8)", "var('x')"]
+        })
+    }
+
+    @Test("curly quotes are normalized at submit: the wire and the row both see ASCII")
+    func smartQuotesNormalizedOnTheWire() async {
+        let model = ShellModel()
+        let order = OrderRecorder()
+        let fake = FakeKernelTransport()
+        fake.respondToSend = { request in
+            guard let id = request["id"] as? String else { return [] }
+            if request["op"] as? String == "symbols" {
+                return [WireFixtures.symbolsResponse(id: id, entries: [])]
+            }
+            order.record(request["code"] as? String ?? "?")
+            return [WireFixtures.okEnvelope(id: id, plain: "", kind: "none")]
+        }
+        model.connectKernel(SessionController(configuration: Self.fastConfig()) { fake })
+
+        model.draft = "print(\u{201C}hello\u{201D})"  // smart-quoted paste
+        model.submitDraft()
+        #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
+        // Sage received Python-valid ASCII quotes…
+        #expect(order.values.last == "print(\"hello\")")
+        // …and the row honestly records exactly what was evaluated.
+        #expect(model.rows[0].input == "print(\"hello\")")
+        #expect(model.rows[0].sage == "print(\"hello\")")
     }
 
     @Test("a boot failure surfaces as an honest issue on the model")

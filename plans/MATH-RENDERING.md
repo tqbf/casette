@@ -152,6 +152,90 @@ starred env `pmatrix*[r]`.)
 
 ---
 
+## V1.5 — how the recommendation landed in the app (additive notes)
+
+V1.5 adopted everything above. The lifted code lives in
+`Sources/Casette/Rendering/` (the one v0/04 file split one-type-per-file, the
+app convention): `MathRenderer.swift` (protocol), `SwiftMathRenderer.swift`
+(active engine + the `MTMathUILabel` representable), `SageLatexNormalizer.swift`
+(the `array`→matrix rewrite, unchanged), `MathView.swift` (the one
+`activeMathRenderer` line + the view cards place). Decisions that EXTEND the
+V0.4 record:
+
+1. **`LaTeXSwiftUIRenderer` was NOT lifted into the app.** It stays on record in
+   the frozen v0/04 proof. Shipping it would add the multi-megabyte
+   MathJax/JavaScriptCore bundles for an engine V0.4 measured as broken here
+   (braced scripts). The *seam* is what survives — swapping engines is still the
+   one `activeMathRenderer` line plus a renderer file.
+2. **Caching (recommendation 5) became `MathRenderCache`** — a `@MainActor`
+   memo keyed by the RAW latex string, holding `(normalized, parses)`. Tape
+   rows re-render on hover/selection and `LazyVStack` recycles rows while
+   scrolling, so without it the regex rewrite + `MTMathListBuilder` parse re-run
+   per body evaluation. Bounded (1024 entries, reset-on-overflow — simple beats
+   clever, SWIFTUI-RULES §3.2). Typesetting itself stays on the main thread:
+   `MTMathUILabel` is an NSView (main-bound by construction) and SwiftMath's
+   native Core Text typeset is fast; the cache removes the *repeated* work,
+   which is what actually threatened scroll performance.
+3. **A second, guarded write barrier in the representable:** SwiftUI calls
+   `sizeThatFits` + `updateNSView` every layout pass, and assigning
+   `MTMathUILabel.latex` re-parses and re-typesets unconditionally — so
+   `configure()` only assigns `latex`/`fontSize`/`labelMode` when the value
+   actually changed.
+4. **The card-level fallback is `plain`, not raw LaTeX** (`MathContent.choose`):
+   when `latex` is missing or fails the (cached) parse check, result cards show
+   the envelope's `plain` text monospaced — more useful than the renderer's
+   raw-source fallback, which remains as the backstop for direct `MathView`
+   callers (e.g. the Inspector preview only renders when `choose` says `.math`).
+5. **Sizes:** block hero 19pt / inline 13pt (`Theme.mathBlockPointSize`/
+   `mathInlinePointSize`) — the one documented hardcoded-point-size deviation
+   (`MTMathUILabel` takes raw points, not semantic styles). Block is set above
+   the title3 (15pt) text hero because typeset math reads optically smaller
+   than mono text at equal point size.
+6. **Bundling:** `build.sh` copies every SwiftPM resource bundle from the build
+   products dir into `Contents/Resources` (today that's
+   `SwiftMath_SwiftMath.bundle/mathFonts.bundle`) — without it math renders
+   nothing at runtime (the V0.4 `bundle.sh` lesson, now in the real build).
+7. **Accessibility:** the typeset math NSView is silent to VoiceOver, so the
+   hero wraps it in `.accessibilityElement(children: .ignore)` +
+   `.accessibilityLabel(plain)` — the envelope's `plain` text is the spoken
+   value. Wide math scrolls horizontally inside the card instead of overflowing.
+
+---
+
+## V1.5 fix round — sizing correction + hero policy (additive)
+
+The live gate caught one real engine trap and froze two policies:
+
+1. **macOS sizing comes from `fittingSize`, NOT `intrinsicContentSize`.**
+   SwiftMath overrides `intrinsicContentSize` on iOS only; on macOS it
+   returns NSView's no-intrinsic sentinel (-1, -1), which sized every math
+   view 0pt wide × (fontSize+6)pt tall. Unclipped layouts masked it (the
+   NSView draws outside its frame); the tape's horizontally scrolling hero
+   exposed it as a squeezed fraction, a clipped matrix bottom row, and an
+   overflowing Inspector preview. The representable's `sizeThatFits` now
+   reads `label.fittingSize`. Full story: PROBLEMS.md (V0.4 sizing trap,
+   corrected). Guarded by `SwiftMathSizingTests`.
+2. **Hero = display mode is policy, not just a mapping.** `.block` →
+   `MTMathUILabelMode.display` matters specifically for fractions: text-mode
+   fractions typeset their digits at SCRIPT size (~70%), inverting the
+   visual hierarchy against the input echo line. Display-mode `\frac{8}{15}`
+   at the 19pt hero size measures ~19×39 vs ~13×23 in text mode. `.inline`
+   (Inspector preview) stays text-mode at 13pt — chrome, not hero.
+3. **A new (narrow) normalizer rule: redundant relation parens.** Sage's
+   `latex()` of a solve list wraps bare numeric right-hand sides:
+   `\left[x = \left(-3\right)\right]`. `stripRedundantRelationParens`
+   rewrites `= \left(-3\right)` → `= -3` for DISPLAY only — only after a
+   relation sign, only a bare signed integer / `a/b` / `\frac{a}{b}`, never
+   when the group carries a script. Copy LaTeX still yields Sage's own
+   unmodified string.
+4. **Inspector preview layout:** leading-aligned, fills the value column,
+   horizontal `ScrollView` for wide matrices (scroll preserves typeset size
+   where scale-to-fit would shrink math unreadably in a 240–400pt column);
+   hidden from VoiceOver — the adjacent Plain/LaTeX fields are the spoken
+   value.
+
+---
+
 ## Evidence
 
 All seven exit criteria were verified **on screen** via the computer-use MCP

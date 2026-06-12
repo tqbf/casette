@@ -92,6 +92,23 @@ enum PlaceholderData {
                 result: statement, at: at(6), duration: 0.0009
             ),
             row(
+                input: "A", sage: "A",
+                result: PersistedEnvelope(
+                    kind: "matrix", plain: "[2 1]\n[1 2]",
+                    // Sage's real matrix LaTeX — the `array` form the
+                    // normalizer rewrites to pmatrix (PROBLEMS.md V0.4).
+                    latex: "\\left(\\begin{array}{rr}\n2 & 1 \\\\\n1 & 2\n\\end{array}\\right)",
+                    repr: "[2 1]\n[1 2]",
+                    actions: ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"]
+                ),
+                at: at(6.5), duration: 0.0012
+            ),
+            row(
+                input: "print(\"hello\")", sage: "print(\"hello\")",
+                result: PersistedEnvelope(kind: "none", plain: "", stdout: "hello\n"),
+                at: at(6.7), duration: 0.0005
+            ),
+            row(
                 input: "A.eigenvalues()", sage: "A.eigenvalues()",
                 result: PersistedEnvelope(
                     kind: "list", plain: "[3, 1]", latex: "\\left[3, 1\\right]",

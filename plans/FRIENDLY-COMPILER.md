@@ -126,6 +126,12 @@ exactly what `e2e.py` does and what proves the pipeline end-to-end. Rationale:
 - The worker's `from sage.all import *` predefines only `x`, not arbitrary
   variables (see PROBLEMS.md, V0.5: a bare `plot(sin(x), …)` `NameError`s in the
   worker until `x = var('x')`). So a prelude is the safe, general path.
+  *(Correction, V1.5 fix round: the star-import predefines NOTHING — not even
+  `x`; only the interactive REPL injects it. Since V1.5 the app matches the
+  REPL by sending a `var('x')` boot prelude after every boot/restart
+  (`ShellModel.bootPrelude`), so this aside is effectively true again at the
+  session level. The always-declare `var('V')` policy below is unchanged and
+  still load-bearing for every other variable.)*
 - Declaring is idempotent and cheap; re-`var('x')` over an existing `x` is
   harmless. V1.4 may optimize by skipping vars the live `symbols` op (V0.6)
   already shows declared, but the simple "always declare required" path is proven.

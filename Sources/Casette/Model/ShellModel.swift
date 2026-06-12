@@ -87,8 +87,20 @@ final class ShellModel {
 
     // MARK: - Kernel
 
+    /// The boot prelude, sent (and discarded) right after every boot AND
+    /// every restart. The real Sage REPL predefines `x` as a symbolic
+    /// variable at startup; the worker's bare star-import does NOT
+    /// (PROBLEMS.md V0.5), so raw-Sage inputs like `expand((x+1)^8)` — which
+    /// bypass the friendly compiler and its `var('V')` preludes —
+    /// NameError'd where the real REPL succeeds. Matching the REPL app-side
+    /// keeps worker.py byte-frozen; `x` honestly appears in the Symbols
+    /// sidebar from boot (the REPL predefines it too). Re-declaring is
+    /// idempotent, so a friendly `var('x')` prelude on top is harmless.
+    static let bootPrelude = "var('x')"
+
     /// Attaches the kernel controller, starts watching its status stream,
-    /// and boots Sage. With no controller attached (previews, pure model
+    /// and boots Sage (followed by the REPL-matching `var('x')` prelude and
+    /// a symbol refresh). With no controller attached (previews, pure model
     /// tests) submissions stay honestly pending, exactly like V1.2.
     func connectKernel(_ controller: SessionController = SessionController()) {
         guard self.controller == nil else { return }
@@ -100,19 +112,24 @@ final class ShellModel {
                 kernelIssue = status.issue
             }
         }
-        enqueueKernelWork {
+        enqueueKernelWork { [weak self] in
             await controller.connect()
+            _ = await controller.evaluate(Self.bootPrelude)
+            await self?.refreshSymbols()
         }
     }
 
     /// Intentionally resets the session's Sage state: kills the worker,
-    /// boots a fresh one, and refreshes the (now empty) symbol table. NOT
-    /// chained behind pending evaluations — restart is the escape hatch and
-    /// must preempt a stuck eval (which then finishes as interrupted).
+    /// boots a fresh one, re-applies the boot prelude (the fresh namespace
+    /// must match the real REPL too), and refreshes the symbol table (now
+    /// just `x`). NOT chained behind pending evaluations — restart is the
+    /// escape hatch and must preempt a stuck eval (which then finishes as
+    /// interrupted).
     func restartKernel() {
         guard let controller else { return }
         Task {
             await controller.restart()
+            _ = await controller.evaluate(Self.bootPrelude)
             await refreshSymbols()
         }
     }

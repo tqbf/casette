@@ -22,6 +22,11 @@ enum Theme {
 
     // MARK: Tape
     static let tapeInset: CGFloat = 16
+    /// Bottom content margin of the tape's scroll view (a scroll-content
+    /// inset, not a spacer view), so the last row — including multi-line
+    /// math heroes like matrices — always rests fully clear of the input
+    /// pane at the default window size.
+    static let tapeBottomMargin: CGFloat = 24
     static let tapeRowSpacing: CGFloat = 2
     static let rowCornerRadius: CGFloat = 8
     static let rowPaddingHorizontal: CGFloat = 12
@@ -29,6 +34,28 @@ enum Theme {
     static let rowInnerSpacing: CGFloat = 5
     static let plotPlaceholderWidth: CGFloat = 220
     static let plotPlaceholderHeight: CGFloat = 130
+
+    // MARK: Math (SwiftMath point sizes)
+    //
+    // The one place hardcoded point sizes are allowed: `MTMathUILabel` takes
+    // a raw `fontSize`, not a semantic style (documented deviation from
+    // §5.1). Block math is the tape's hero — set ABOVE the title3 text hero
+    // (15pt) because typeset math (fractions, scripts, matrices) reads
+    // optically smaller than mono text at equal point size.
+    /// Hero math in a result card.
+    static let mathBlockPointSize: CGFloat = 19
+    /// Small math woven into chrome (the Inspector's LaTeX preview).
+    static let mathInlinePointSize: CGFloat = 13
+
+    // MARK: Result card (V1.5)
+    /// Vertical gap between an expanded card's sections (8-grid).
+    static let cardSectionSpacing: CGFloat = 8
+    /// Gap between a section's label and its value.
+    static let cardSectionLabelSpacing: CGFloat = 2
+    /// Inset of the expanded detail block from the row's leading edge.
+    static let cardExpandedInset: CGFloat = 14
+    /// Max height of a traceback disclosure before it scrolls.
+    static let tracebackMaxHeight: CGFloat = 180
 
     // MARK: Input pane
     static let inputPaddingHorizontal: CGFloat = 16
@@ -84,6 +111,16 @@ enum Theme {
         static let meta = Font.caption
         /// Error type name above an error message.
         static let errorType = Font.caption.weight(.semibold)
+        /// Section labels in an expanded card ("Input", "Generated Sage",
+        /// "Plain") — chrome at the metadata scale, weight for structure.
+        static let cardSectionLabel = Font.caption.weight(.semibold)
+        /// Sage/math text inside an expanded card's sections and captured
+        /// stdout — content voice (mono), one step under the result hero.
+        static let cardMono = Font.callout.monospaced()
+        /// Traceback text — diagnostic content, dense, smallest mono scale.
+        static let tracebackMono = Font.caption.monospaced()
+        /// The truncation note under a capped result (metadata voice).
+        static let truncationNote = Font.caption
         /// Symbol name in the Symbols tab.
         static let symbolName = Font.body.weight(.semibold).monospaced()
         /// Symbol summary / history entries — Sage text in chrome contexts.

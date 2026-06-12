@@ -2,9 +2,15 @@ import Foundation
 
 // MARK: - Persisted result envelope (a render-ready SUBSET of the worker envelope)
 //
-// LIFTED VERBATIM from v0/10-persistence/Sources/SessionStore/PersistedEnvelope.swift
+// LIFTED from v0/10-persistence/Sources/SessionStore/PersistedEnvelope.swift
 // (the frozen SESSION-FORMAT.md schema, version 1). This is the V1.2
 // `ResultEnvelope` / `Artifact` — see the typealiases at the end of this file.
+//
+// V1.5 additive change (the one deviation from the verbatim lift, documented
+// in SESSION-FORMAT.md): the optional `truncation` field carries the worker's
+// truncation sizes so the UI can say "showing N of M characters" honestly
+// instead of a bare "truncated". Optional + omitted-when-nil → schema v1
+// files (with or without it) round-trip unchanged; old readers ignore it.
 //
 // The worker envelope (WORKER-PROTOCOL.md) carries transient framing (`id`,
 // `op`, `value`) and large optional payloads. What the UI needs to RENDER a
@@ -42,6 +48,10 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
   public var artifacts: [PersistedArtifact]
   /// Was `plain`/`repr` capped by the worker?
   public var truncated: Bool
+  /// The worker's truncation sizes (original lengths + caps), present only
+  /// when `truncated` — drives the honest "showing N of M characters" note.
+  /// (V1.5 additive field; see the header note.)
+  public var truncation: PersistedTruncation?
   /// Captured user `print()` / raw-fd output, if any (kept because it's display).
   public var stdout: String?
   public var stderr: String?
@@ -61,6 +71,7 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
     actions: [String] = [],
     artifacts: [PersistedArtifact] = [],
     truncated: Bool = false,
+    truncation: PersistedTruncation? = nil,
     stdout: String? = nil,
     stderr: String? = nil,
     error: PersistedError? = nil
@@ -77,9 +88,34 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
     self.actions = actions
     self.artifacts = artifacts
     self.truncated = truncated
+    self.truncation = truncation
     self.stdout = stdout
     self.stderr = stderr
     self.error = error
+  }
+}
+
+/// The worker's truncation detail (WORKER-PROTOCOL.md `truncation` object):
+/// the ORIGINAL sizes of `plain`/`repr` plus the caps that were applied, so
+/// the UI can render "showing N of M characters". (V1.5 additive.)
+public struct PersistedTruncation: Codable, Equatable, Sendable {
+  /// Original (pre-cap) length of `plain`, in characters.
+  public var plainLength: Int?
+  /// Original (pre-cap) length of `repr`, in characters.
+  public var reprLength: Int?
+  /// The cap applied to `plain`.
+  public var plainCap: Int?
+  /// The cap applied to `repr`.
+  public var reprCap: Int?
+
+  public init(
+    plainLength: Int? = nil, reprLength: Int? = nil,
+    plainCap: Int? = nil, reprCap: Int? = nil
+  ) {
+    self.plainLength = plainLength
+    self.reprLength = reprLength
+    self.plainCap = plainCap
+    self.reprCap = reprCap
   }
 }
 

@@ -111,12 +111,19 @@ needs to render a row with NO worker**:
 | `actions` | `actions` | the V1.11 actions menu |
 | `artifacts` | `artifacts` | plots, **as path refs + liveness** (below) |
 | `truncated` | `truncated` | "N of M chars" affordance |
+| `truncation` | `truncation` | the sizes behind that affordance — `{plainLength, reprLength, plainCap, reprCap}`, optional, present only when `truncated` (**V1.5 additive**; see note below) |
 | `stdout` / `stderr` | same | captured user output (display); empty folds to nil |
 | `error` | `error` | error/interrupted detail |
 
 **Dropped:** `id` (the row has its own UUID), `op` (framing), `value` (status
-covers it), `truncation` (the sizes; `truncated` boolean is enough for restore).
-All additive — re-evaluating restores the full worker envelope.
+covers it). All additive — re-evaluating restores the full worker envelope.
+
+> **V1.5 additive change (the one deviation from the V0.10 lift):** the
+> optional `truncation` object was originally dropped ("`truncated` boolean is
+> enough for restore"), but V1.5's result cards render the honest "showing N of
+> M characters" note, which needs the original sizes. The field is optional and
+> omitted-when-nil, so schema **v1** files with or without it round-trip
+> unchanged and old readers ignore it — no schema bump.
 
 `PersistedEnvelope(workerResponse:)` is the single mapping boundary from the raw
 `[String: Any]` wire object to the model; it is **tolerant** (missing fields →

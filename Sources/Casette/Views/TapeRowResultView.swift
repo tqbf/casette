@@ -1,19 +1,22 @@
 import SwiftUI
 
-/// The result portion of a tape row, switched on the row's status. Plain
-/// monospaced text for now — V1.5 swaps in rendered math (SwiftMath behind
-/// the `MathRenderer` abstraction) and V1.7 real plot artifacts.
+/// The result portion of a tape row, switched on the row's card kind (the
+/// V1.5 vocabulary: scalar exact/approximate, symbolic, matrix, list, plot,
+/// text/stdout, error). Math-bearing cards render the envelope's `latex`
+/// through `ResultHeroView` (SwiftMath behind the `MathRenderer`
+/// abstraction, plain-mono fallback); captured stdout shows above the result
+/// for every card, in execution order.
 ///
 /// An incomplete (`.running`) row is presented honestly based on the kernel:
-/// with no kernel connected (V1.2) it reads "Not evaluated"; once V1.3 wires
-/// `SageKernel` in, the same row reads "Evaluating…" with a spinner.
+/// with no kernel connected it reads "Not evaluated"; with a kernel it reads
+/// "Evaluating…" with a spinner.
 struct TapeRowResultView: View {
     let row: SessionRow
     let isKernelConnected: Bool
 
     var body: some View {
-        switch row.status {
-        case .running:
+        switch row.cardKind {
+        case .pending:
             if isKernelConnected {
                 HStack(spacing: Theme.rowInnerSpacing) {
                     ProgressView()
@@ -31,30 +34,39 @@ struct TapeRowResultView: View {
                     .foregroundStyle(.secondary)
             }
         case .error:
-            errorBody(tint: .red, fallbackTitle: "Error")
+            stdoutAndThen { errorBody(tint: .red, fallbackTitle: "Error") }
         case .interrupted:
-            errorBody(tint: .orange, fallbackTitle: "Interrupted")
-        case .ok:
-            if row.isPlot {
-                PlotPlaceholderView(caption: row.result?.plain ?? "")
-            } else if !row.isStatement, let result = row.result {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(result.plain)
-                        .font(Theme.Fonts.resultPrimary)
-                        .textSelection(.enabled)
-                    if let approx = result.approx {
-                        Text("≈ \(approx)")
-                            .font(Theme.Fonts.resultSecondary)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
+            stdoutAndThen { errorBody(tint: .orange, fallbackTitle: "Interrupted") }
+        case .statement:
+            // A statement echoes no value; only captured output shows.
+            if let stdout = row.result?.stdout {
+                StdoutBlockView(stdout: stdout)
+            }
+        case .plot:
+            stdoutAndThen { PlotPlaceholderView(caption: row.result?.plain ?? "") }
+        case .scalarExact, .scalarApproximate, .symbolic, .matrix, .list, .text:
+            stdoutAndThen {
+                if let result = row.result {
+                    ResultHeroView(result: result)
                 }
             }
         }
     }
 
+    /// Captured stdout precedes the result body — that's the order it
+    /// happened in (prints run before the value echo).
+    private func stdoutAndThen(@ViewBuilder _ body: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: Theme.rowInnerSpacing) {
+            if let stdout = row.result?.stdout {
+                StdoutBlockView(stdout: stdout)
+            }
+            body()
+        }
+    }
+
     /// Error and interrupted rows share an anatomy: the type line over the
-    /// message, tinted (red = failed, orange = stopped by the user).
+    /// message, tinted (red = failed, orange = stopped by the user). The
+    /// traceback stays behind the expanded card's disclosure.
     private func errorBody(tint: Color, fallbackTitle: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(row.errorType ?? fallbackTitle)

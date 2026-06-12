@@ -321,7 +321,9 @@ struct ShellModelInputTests {
         model.draft = "integral t^2, t=0..2"
         model.submitDraft()
         #expect(await eventually { @MainActor in model.rows.first?.status == .ok })
-        #expect(order.values == ["var('t')", "integrate(t^2, (t, 0, 2))"])
+        // The boot prelude leads (every boot applies it, V1.5 fix round),
+        // then the submission's own prelude, then the generated Sage.
+        #expect(order.values == [ShellModel.bootPrelude, "var('t')", "integrate(t^2, (t, 0, 2))"])
         // The row's envelope is the MAIN eval's, not a prelude's.
         #expect(model.rows[0].result?.plain == "8/3")
         #expect(model.rows[0].sage == "integrate(t^2, (t, 0, 2))")

@@ -56,6 +56,38 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.5 done (live gate PASSED after one fix round — verifier verdict: "a
+polished, native-feeling macOS calculator tape") — the tape renders math.**
+The phase spans four agent runs (implementer killed mid-phase by quota; a
+completion agent audited every spec item as genuinely implemented and ran the
+gate; the live verifier returned PASS-with-caveats; a fix round resolved all
+six — incl. boot-time `var('x')` matching the real REPL, and the macOS
+`fittingSize` sizing trap — and re-verification passed all 8 checks). The V0.4 `MathRenderer`
+abstraction + SwiftMath (pinned ≥1.7.3) are lifted into
+`Sources/Casette/Rendering/` with two V1.5 additions: a bounded `@MainActor`
+`MathRenderCache` (memoized normalize+parse so LazyVStack recycling and
+hover/selection re-renders never re-run the regex rewrite or the parser — new
+PROBLEMS.md entry, incl. the write-guarded `MTMathUILabel` configure) and
+`MathContent` (card-level fallback: math only when the cached parse succeeds,
+else monospaced `plain` — malformed LaTeX never crashes, never shows raw
+source in a card). `ResultCardKind` derives the spec's card vocabulary
+(scalar exact/approx incl. V0.8 force-numeric, symbolic, matrix, list, plot
+chrome until V1.7, text/stdout, error) from the frozen envelope —
+presentation only. Cards: collapsed = chevron + input echo + rendered hero
+(`≈ approx` secondary, honest "showing N of M characters" via the one
+additive schema field `truncation`, documented in SESSION-FORMAT.md);
+expanded (persisted `SessionRow.expanded`) = Input / Generated Sage / Plain
+sections + traceback disclosure (hidden by default); stdout as a labeled
+block above results; copy everywhere (context menu: input/Sage/result/
+LaTeX/traceback; hover button; per-section menus). `build.sh` bundles
+SwiftMath's `mathFonts.bundle`. `make check` / **`make test` 197/197** (incl.
+real-Sage rendering integration: `array`→pmatrix end-to-end, `x^{8}` braced
+scripts, truncation sizes, stdout) / `make build` green; full V0 regression
+re-run clean; swiftui-pro/macos-design/typography-designer findings applied;
+launch/quit clean, `pgrep` clean. **On-screen verifier checklist (15 items)
+in PROGRESS.md — pending.** **Next: V1.6 — sidebar v1** (after the V1.5 live
+gate passes).
+
 **V1.4 done (live gate PASSED, rounds 4+5 combined) — the input pane is a calculator
 and the friendly compiler is wired in.** `FriendlyCompiler` is lifted from
 v0/07 as a second SwiftPM library target (`Sources/FriendlyCompiler/`,

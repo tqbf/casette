@@ -35,6 +35,10 @@ extension SessionRow {
     /// `durationSeconds` under the name the views/spec use.
     var duration: TimeInterval? { durationSeconds }
 
+    /// Which V1.5 result card this row renders. Derived from status + the
+    /// frozen envelope fields; presentation only.
+    var cardKind: ResultCardKind { ResultCardKind(row: self) }
+
     /// Applies a finished evaluation to this (pending) row. Identity, input,
     /// sage, and timestamp are untouched — only the outcome fields change.
     /// Provenance becomes `cached` with `cachedAt = date`, matching the V0.10
@@ -45,5 +49,17 @@ extension SessionRow {
         result = evaluation.result
         durationSeconds = evaluation.duration
         provenance = Provenance(kind: .cached, cachedAt: date)
+    }
+}
+
+extension PersistedEnvelope {
+    /// The honest truncation note for a capped result ("showing N of M
+    /// characters", per the worker's truncation object), or nil when the
+    /// result wasn't truncated. Falls back to a plain "Truncated by Sage"
+    /// when the sizes weren't recorded (e.g. a pre-V1.5 restored session).
+    var truncationNote: String? {
+        guard truncated else { return nil }
+        guard let total = truncation?.plainLength else { return "Truncated by Sage" }
+        return "Truncated — showing \(plain.count.formatted()) of \(total.formatted()) characters"
     }
 }

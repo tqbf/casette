@@ -19,10 +19,38 @@ struct InspectorTabView: View {
                             InspectorMonoField(label: "Approx", value: "≈ \(approx)")
                         }
                         if let latex = result.latex {
+                            // Small rendered preview above the source —
+                            // only when the engine can actually parse it.
+                            // Leading-aligned and clipped to the column;
+                            // wide math (matrices) scrolls horizontally,
+                            // the same idiom as the tape hero — scrolling
+                            // keeps the typeset size honest where
+                            // scale-to-fit would shrink it unreadably.
+                            if case .math = MathContent.choose(latex: latex) {
+                                LabeledContent("Rendered") {
+                                    ScrollView(.horizontal) {
+                                        MathView(latex: latex, displayStyle: .inline)
+                                    }
+                                    .scrollIndicators(.automatic)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    // The typeset NSView is silent to
+                                    // VoiceOver; the Plain and LaTeX fields
+                                    // beside it carry the spoken value, so
+                                    // hide the preview instead of reading an
+                                    // empty "Rendered" row.
+                                    .accessibilityHidden(true)
+                                }
+                            }
                             InspectorMonoField(label: "LaTeX", value: latex)
+                        }
+                        if let note = result.truncationNote {
+                            LabeledContent("Truncated", value: note)
                         }
                         if let error = result.error {
                             LabeledContent("Error", value: error.type)
+                            if let traceback = error.traceback, !traceback.isEmpty {
+                                TracebackDisclosureView(traceback: traceback)
+                            }
                         }
                     } else {
                         LabeledContent("Status", value: "Not evaluated")

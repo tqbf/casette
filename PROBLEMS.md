@@ -4,6 +4,42 @@ One entry per pattern lesson that cost real debugging. Newest at top.
 
 ---
 
+## SwiftMath in a LIVE tape: memoize normalize+parse, and guard every `MTMathUILabel` property write — `sizeThatFits` runs each layout pass and the `latex` setter re-typesets
+
+**The trap (V1.5).** Dropping the proven V0.4 renderer into the real session
+tape changes the workload: v0/04 rendered a static list once; the app's
+`LazyVStack` recycles rows while scrolling, and EVERY hover/selection change
+re-evaluates row bodies. Two costs that were invisible in the proof app
+multiply:
+
+1. **The per-string work re-runs per body evaluation.** `SageLatexNormalizer`
+   (four `NSRegularExpression` passes) + the `MTMathListBuilder` parse-check
+   ran inside `render(...)` — so hovering a row re-normalized and re-parsed
+   every visible LaTeX string on the main thread. Fix: `MathRenderCache`, a
+   `@MainActor` memo keyed by the raw envelope `latex` holding
+   `(normalized, parses)`. Bounded (1024, whole-cache reset on overflow — a
+   self-patching cache is its own bug class, SWIFTUI-RULES §3.2).
+2. **`NSViewRepresentable.sizeThatFits` + `updateNSView` run every layout
+   pass, and `MTMathUILabel.latex`'s setter re-parses + re-typesets
+   unconditionally** (so do `fontSize`/`labelMode`). Configure must be
+   write-guarded (`if label.latex != latex { label.latex = latex }`), or
+   scrolling typesets the same math over and over.
+
+Typesetting itself stays main-thread — `MTMathUILabel` is an NSView and
+SwiftMath's native Core Text typeset is fast; what hitches a tape is the
+*repeated* work, not the first render. (If a future giant expression is ever
+slow, render once to an image off the label — don't move the NSView off main.)
+
+**Corollary — the card-level fallback should be `plain`, not the raw LaTeX.**
+The V0.4 renderer contract degrades malformed LaTeX to its raw source (right
+for a rendering proof). In a result card the user wants the VALUE: the worker
+always provides `plain`, which is strictly more readable than broken LaTeX
+source. So cards pre-check with `MathContent.choose(latex:)` (same memoized
+parse) and fall back to monospaced `plain`; the renderer's raw-source fallback
+remains only as the backstop for direct `MathView` callers.
+
+---
+
 ## A macOS SwiftUI `.popover` is its OWN KEY WINDOW — keys reach neither it nor your editor; transient pickers over a focused text field must be INLINE same-window overlays
 
 **The symptoms, across three fix rounds (V1.4).** The ambiguity picker as a
@@ -591,13 +627,26 @@ wrapper — `\left(…array…\right)` → `\begin{pmatrix}…\end{pmatrix}`, `[
 `|`→vmatrix. Cell body (`&`, `\\`) is unchanged. (Verified on screen: Sage's
 `(1 2 / 3 4)` renders with parentheses after the rewrite.)
 
-**Trap 2 — sizing.** `MTMathUILabel` is an `NSView`. Dropped into a SwiftUI layout
-naively, it reports no useful size and **collapses to zero height**, so tall glyphs
-(∫, ∑, matrices, fractions) overlap the row's caption above and plain line below.
-Fix: in the `NSViewRepresentable`, implement `sizeThatFits(_:nsView:context:)` and
-return `MTMathUILabel.intrinsicContentSize` (which SwiftMath overrides to the
-rendered math size) plus a few points of vertical margin. (`MTMathUILabel` has no
-`sizeThatFits` method on macOS — use `intrinsicContentSize`.)
+**Trap 2 — sizing (CORRECTED in the V1.5 fix round; the V0.4 advice was wrong
+on macOS).** `MTMathUILabel` is an `NSView`. Dropped into a SwiftUI layout
+naively, it reports no useful size and **collapses**, so tall glyphs
+(∫, ∑, matrices, fractions) overlap or clip. Fix: in the
+`NSViewRepresentable`, implement `sizeThatFits(_:nsView:context:)` and return
+**`MTMathUILabel.fittingSize`** plus a few points of vertical margin.
+
+**Do NOT use `intrinsicContentSize` (the original V0.4 advice): SwiftMath
+overrides it on iOS ONLY.** On macOS the property falls through to NSView's
+no-intrinsic sentinel **(-1, -1)**, so the V0.4/V1.5 wrapper silently sized
+every math view **0pt wide × (fontSize+6)pt tall**. The v0/04 proof — and
+single-line math in the app — *looked* right anyway because the NSView drew
+outside its zero-size frame unclipped; the live gate exposed it the moment a
+hero sat inside a clipping `ScrollView`: `8/15` squeezed below the input
+echo, a matrix's bottom row cut off, the Inspector preview showing one paren.
+The macOS accessor for "the rendered math size" is `fittingSize` (both call
+the same internal `_sizeThatFits`). Locked in by `SwiftMathSizingTests`,
+which will fail loudly if a SwiftMath bump moves these overrides. **Rule: an
+NSView "working" in a non-clipping layout proves nothing about its reported
+size — assert the representable's returned size, not the pixels.**
 
 **Win — dark mode is free.** Set `label.textColor = .labelColor` (a *dynamic*
 semantic `NSColor`). It re-tints the math to white in dark mode automatically; no

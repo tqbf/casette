@@ -31,6 +31,17 @@ extension PersistedEnvelope {
     let stdout = response["stdout"] as? String
     let stderr = response["stderr"] as? String
 
+    // The V0.3 truncation object ({plain_len, repr_len, plain_cap, repr_cap}),
+    // present only when `truncated` — the "showing N of M chars" sizes (V1.5).
+    var truncation: PersistedTruncation?
+    if let truncationObject = response["truncation"] as? [String: Any] {
+      truncation = PersistedTruncation(
+        plainLength: truncationObject["plain_len"] as? Int,
+        reprLength: truncationObject["repr_len"] as? Int,
+        plainCap: truncationObject["plain_cap"] as? Int,
+        reprCap: truncationObject["repr_cap"] as? Int)
+    }
+
     var error: PersistedError?
     if let errorObject = response["error"] as? [String: Any] {
       error = PersistedError(
@@ -56,6 +67,7 @@ extension PersistedEnvelope {
       actions: actions,
       artifacts: artifacts,
       truncated: truncated,
+      truncation: truncation,
       stdout: (stdout?.isEmpty == true) ? nil : stdout,
       stderr: (stderr?.isEmpty == true) ? nil : stderr,
       error: error)

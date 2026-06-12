@@ -290,4 +290,27 @@ struct EnvelopeMappingTests {
         let response: [String: Any] = ["ok": false, "kind": "interrupted"]
         #expect(RowStatus(workerResponse: response) == .interrupted)
     }
+
+    @Test("maps the worker truncation object (V1.5 — 'N of M chars')")
+    func mapsTruncation() {
+        let response: [String: Any] = [
+            "ok": true, "kind": "integer", "value": true,
+            "plain": "2846 …", "truncated": true,
+            "truncation": [
+                "plain_len": 456_574, "repr_len": 456_574,
+                "plain_cap": 8192, "repr_cap": 8192,
+            ],
+        ]
+        let envelope = PersistedEnvelope(workerResponse: response)
+        #expect(envelope.truncated)
+        #expect(envelope.truncation?.plainLength == 456_574)
+        #expect(envelope.truncation?.plainCap == 8192)
+        #expect(envelope.truncation?.reprLength == 456_574)
+        #expect(envelope.truncation?.reprCap == 8192)
+
+        // Untruncated responses carry no truncation object → nil field.
+        let small = PersistedEnvelope(workerResponse: ["ok": true, "kind": "integer", "plain": "4"])
+        #expect(!small.truncated)
+        #expect(small.truncation == nil)
+    }
 }

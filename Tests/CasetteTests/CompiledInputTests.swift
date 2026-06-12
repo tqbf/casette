@@ -78,6 +78,42 @@ struct CompiledInputTests {
         #expect(candidates == ["solve(x*y == 1, x)", "solve(x*y == 1, y)"])
     }
 
+    @Test("smart quotes normalize to ASCII at the compile boundary (raw records what was evaluated)")
+    func smartQuotesNormalize() {
+        // macOS smart-quote substitution: print(“hello”) must not SyntaxError.
+        guard case let .ready(curly) = CompiledInput.compile("print(\u{201C}hello\u{201D})") else {
+            Issue.record("expected .ready")
+            return
+        }
+        #expect(curly.raw == "print(\"hello\")")  // honest: raw == what ran
+        #expect(curly.sage == "print(\"hello\")")
+        #expect(curly.origin == .bypass)
+
+        // Curly single quotes too.
+        guard case let .ready(single) = CompiledInput.compile("print(\u{2018}hi\u{2019})") else {
+            Issue.record("expected .ready")
+            return
+        }
+        #expect(single.sage == "print('hi')")
+
+        // The multiline raw-Sage path normalizes as well (it never reaches
+        // the friendly compiler, but quotes still must be Python-valid).
+        guard case let .ready(multiline) =
+            CompiledInput.compile("a = \u{201C}x\u{201D}\nprint(a)")
+        else {
+            Issue.record("expected .ready")
+            return
+        }
+        #expect(multiline.sage == "a = \"x\"\nprint(a)")
+
+        // No curly quotes → input passes through byte-identical.
+        guard case let .ready(plain) = CompiledInput.compile("print(\"hello\")") else {
+            Issue.record("expected .ready")
+            return
+        }
+        #expect(plain.sage == "print(\"hello\")")
+    }
+
     @Test("a chosen ambiguity candidate re-derives its required variables")
     func chosenCandidateVariables() {
         let compiled = CompiledInput.chosenCandidate(

@@ -23,13 +23,20 @@ struct SessionTapeView: View {
                                 row: row,
                                 isSelected: model.selectedRowID == row.id,
                                 isKernelConnected: model.kernelState.isConnected,
-                                onSelect: { model.select(row.id) }
+                                onSelect: { model.select(row.id) },
+                                onToggleExpanded: { model.toggleExpanded(rowID: row.id) }
                             )
                             .id(row.id)
                         }
                     }
-                    .padding(Theme.tapeInset)
+                    .padding([.horizontal, .top], Theme.tapeInset)
                 }
+                // Bottom clearance is a CONTENT MARGIN (not padding on the
+                // stack and not a spacer): the scroll geometry itself ends
+                // above the input pane, so resting at the bottom anchor —
+                // and `scrollTo(anchor: .bottom)` — always leaves the last
+                // row's full height (matrix bottom rows included) visible.
+                .contentMargins(.bottom, Theme.tapeBottomMargin, for: .scrollContent)
                 .defaultScrollAnchor(.bottom)
                 .onChange(of: model.rows.count) {
                     scrollToBottom(proxy)
