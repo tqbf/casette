@@ -348,6 +348,46 @@ struct ShellModelInputTests {
         #expect(model.draftPreview == .generated("solve(x*y == 1, x)"))
     }
 
+    @Test("sum formula bar model rewrites friendly IR with filled bounds")
+    func sumFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "sum k^2"
+        guard case let .seriesRange(formula0) = model.formulaIR, formula0.kind == .sum else {
+            Issue.record("expected seriesRange(sum) formula")
+            return
+        }
+        #expect(formula0.expression == "k^2")
+        #expect(formula0.indexVariable.isEmpty)
+
+        var formula = formula0
+        formula.indexVariable = "k"
+        formula.lowerBound = "1"
+        formula.upperBound = "n"
+        model.updateFormula(.seriesRange(formula))
+        #expect(model.draft == "sum k^2, k=1..n")
+        #expect(model.seriesRangeFormula?.lowerBound == "1")
+        #expect(model.seriesRangeFormula?.upperBound == "n")
+        #expect(model.draftPreview == .generated("sum(k^2, k, 1, n)"))
+    }
+
+    @Test("limit formula bar model rewrites a direction edit")
+    func limitFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "limit sin(x)/x, x->0"
+        guard case let .limit(formula0) = model.formulaIR else {
+            Issue.record("expected limit formula")
+            return
+        }
+        #expect(formula0.direction == .both)
+
+        var formula = formula0
+        formula.direction = .right
+        model.updateFormula(.limit(formula))
+        #expect(model.draft == "limit sin(x)/x, x->0, right")
+        #expect(model.limitFormula?.direction == .right)
+        #expect(model.draftPreview == .generated("limit(sin(x)/x, x=0, dir='+')"))
+    }
+
     @Test("tape references use visible row numbers but only successful reusable rows are valid")
     func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
         let rows = [

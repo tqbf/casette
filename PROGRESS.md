@@ -22,6 +22,22 @@ the argument lane, and the formula expansion now sits on its own full-width
 lane below the input controls so the optional bounds are visible without
 horizontal scrolling at the normal window size.
 
+**Completion UI Batch B:** Formula bars now also cover `derivative`, `limit`,
+`taylor`, `sum`, and `product`. New keyword lowerings `sum`/`product` mirror the
+definite-integral branch (`sum k^2, k=1..n` → `sum(k^2, k, 1, n)`, lowercase
+symbolic Sage). The `derivative` lowering gained an optional trailing `, N`
+order (comma form only; `derivative sin(x), 2` → `derivative(sin(x), x, 2)`)
+and `limit` gained an optional `left`/`right` third clause
+(`dir='-'`/`dir='+'`); both extensions are byte-identical to before when the new
+clause is absent, so the frozen V0.7 contract is untouched. Four new IRs
+(`DerivativeFormulaIR`, `LimitFormulaIR`, `TaylorFormulaIR`, and the
+sum/product `SeriesRangeFormulaIR`) parse/round-trip back to friendly input and
+preserve `#ROW` references; `FormulaIR` dispatch, `ShellModel` accessors, the
+four bar views (the limit bar uses a `.menu` Picker for the direction), and
+`FormulaBarView` are wired up. Bounds remain one semantic chip group. New
+lowering/IR/round-trip/`#ROW` tests plus model-rewrite tests for sum and limit;
+`make check` and `make test` green at **366/366**.
+
 **Previous maintenance:** Restored tape rows now read as **not live** until Replay Session recomputes them into the current Sage namespace. The tape still restores render-ready from disk, but cached rows are visually deemphasized and row-derived execution affordances (History rerun, plot regenerate, Approximate Numerically, and Actions-tab command buttons) are disabled/guarded so users do not fire commands against variables that are only present in the old persisted transcript. Replayed rows become live again and regain the normal affordances. A focused persistence test covers the stale-row guard; `make check`, `make test` (**298/298**), and `make build` are green.
 
 **Current phase:** V1.10 complete — Sage Doctor in app. **Next:** V1.11 — Result Actions, starting by reconciling the existing V1.6 Actions-tab implementation with `plans/INITIAL.md`.

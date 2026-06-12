@@ -497,6 +497,26 @@ final class ShellModel {
         return ir
     }
 
+    var derivativeFormula: DerivativeFormulaIR? {
+        guard case let .derivative(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var limitFormula: LimitFormulaIR? {
+        guard case let .limit(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var taylorFormula: TaylorFormulaIR? {
+        guard case let .taylor(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var seriesRangeFormula: SeriesRangeFormulaIR? {
+        guard case let .seriesRange(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }

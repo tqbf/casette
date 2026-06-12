@@ -71,6 +71,8 @@ public enum FriendlyCompiler {
         case .limit:        return limitForm(rest)
         case .taylor:       return taylor(rest)
         case .plot:         return plot(rest)
+        case .sum:          return seriesRange(rest, sage: "sum", command: "sum")
+        case .product:      return seriesRange(rest, sage: "product", command: "product")
         case .matrix:       return matrixForm(rest)
         case .eigenvalues:  return matrixMethod(rest, method: "eigenvalues")
         case .rref:         return matrixMethod(rest, method: "rref")
@@ -82,6 +84,7 @@ public enum FriendlyCompiler {
     enum Keyword: CaseIterable {
         case factor, expand, simplify, solve, derivative
         case integral, doubleIntegral, limit, taylor, plot
+        case sum, product
         case matrix, eigenvalues, rref
 
         /// The phrase(s) that introduce this command. Multi-word first so the
@@ -98,6 +101,8 @@ public enum FriendlyCompiler {
             case .limit: return ["limit"]
             case .taylor: return ["taylor"]
             case .plot: return ["plot"]
+            case .sum: return ["sum"]
+            case .product: return ["product"]
             case .matrix: return ["matrix"]
             case .eigenvalues: return ["eigenvalues", "eigenvalue"]
             case .rref: return ["rref"]
@@ -118,6 +123,8 @@ public enum FriendlyCompiler {
             case .limit: return "Try: limit sin(x)/x, x->0"
             case .taylor: return "Try: taylor sin(x), x=0, order=7"
             case .plot: return "Try: plot sin(x), x=-pi..pi"
+            case .sum: return "Try: sum k^2, k=1..n"
+            case .product: return "Try: product 1 + 1/k, k=1..n"
             case .matrix: return "Try: matrix [1,2; 3,4]"
             case .eigenvalues: return "Try: eigenvalues [1,2; 3,4]"
             case .rref: return "Try: rref [1,2; 3,4]"
@@ -241,14 +248,38 @@ public enum FriendlyCompiler {
     // MARK: - Form: derivative
 
     private static func derivative(_ payload: String) -> CompileResult {
+        // Peel the trailing `wrt v` clause first (as before), so the comma split
+        // below sees only the body (+ an optional trailing order).
         var body = payload
         var wrtVar: String?
         if let range = trailingClause(in: body, keyword: "wrt") {
             wrtVar = body[range.valueRange].trimmedShim
             body = String(body[body.startIndex..<range.clauseStart]).trimmedShim
         }
+
+        // Optional trailing order, comma form ONLY: split on top-level commas and
+        // if the LAST part is all digits, peel it off as the order. The remainder
+        // re-joins as the differentiation body and flows through the UNCHANGED
+        // wrt/inference logic — so a payload with no trailing digit clause is
+        // byte-identical to before (the single-part split returns the body intact).
+        var order: String?
+        let parts = Scanner.splitTopLevelCommas(body)
+        if parts.count >= 2,
+           let last = parts.last?.trimmedShim,
+           !last.isEmpty, last.allSatisfy({ $0.isNumber }) {
+            order = last
+            body = parts.dropLast().joined(separator: ",").trimmedShim
+        }
+
         let expr = body.trimmedShim
         let vars = Variables.freeVariables(in: expr)
+
+        // Build the Sage call for a chosen variable, with the order appended when
+        // present: derivative(expr, v) or derivative(expr, v, N).
+        func call(_ v: String) -> String {
+            if let order { return "derivative(\(expr), \(v), \(order))" }
+            return "derivative(\(expr), \(v))"
+        }
 
         if let v = wrtVar, !v.isEmpty {
             guard Variables.isPlausibleVariable(v) else {
@@ -259,7 +290,7 @@ public enum FriendlyCompiler {
             }
             var req = vars
             if !req.contains(v) { req.insert(v, at: 0) }
-            return .success(generatedSage: "derivative(\(expr), \(v))", requiredVariables: req)
+            return .success(generatedSage: call(v), requiredVariables: req)
         }
 
         switch vars.count {
@@ -269,9 +300,9 @@ public enum FriendlyCompiler {
                 suggestion: "Add one: derivative \(expr) wrt x"
             ))
         case 1:
-            return .success(generatedSage: "derivative(\(expr), \(vars[0]))", requiredVariables: vars)
+            return .success(generatedSage: call(vars[0]), requiredVariables: vars)
         default:
-            let candidates = vars.map { "derivative(\(expr), \($0))" }
+            let candidates = vars.map { call($0) }
             return .ambiguous(candidates: candidates)
         }
     }
@@ -374,7 +405,7 @@ public enum FriendlyCompiler {
     // MARK: - Form: limit
 
     private static func limitForm(_ payload: String) -> CompileResult {
-        // `limit EXPR, VAR->VAL`. Split first top-level comma: expr, approach.
+        // `limit EXPR, VAR->VAL` with an optional third clause `left`/`right`.
         let parts = Scanner.splitTopLevelCommas(payload)
         guard parts.count >= 2 else {
             return .error(CompileError(
@@ -383,7 +414,26 @@ public enum FriendlyCompiler {
             ))
         }
         let expr = parts[0].trimmedShim
-        let approach = parts[1...].joined(separator: ", ").trimmedShim
+
+        // An optional trailing `left`/`right` clause names the one-sided direction.
+        // It is recognized only as a standalone third part (not a fragment of the
+        // approach), so the two-clause form is unchanged.
+        var dir: String?
+        var approachParts = Array(parts[1...])
+        if approachParts.count >= 2 {
+            let tail = approachParts[approachParts.count - 1].trimmedShim.lowercased()
+            switch tail {
+            case "left": dir = "-"
+            case "right": dir = "+"
+            default:
+                return .error(CompileError(
+                    message: "`limit` direction must be `left` or `right`.",
+                    suggestion: "Try: limit sin(x)/x, x->0, right"
+                ))
+            }
+            approachParts.removeLast()
+        }
+        let approach = approachParts.joined(separator: ", ").trimmedShim
         // Split on `->`.
         guard let arrowRange = approach.range(of: "->") else {
             return .error(CompileError(
@@ -405,7 +455,12 @@ public enum FriendlyCompiler {
                 suggestion: "Try: limit sin(x)/x, x->0"
             ))
         }
-        let sage = "limit(\(expr), \(v)=\(point))"
+        let sage: String
+        if let dir {
+            sage = "limit(\(expr), \(v)=\(point), dir='\(dir)')"
+        } else {
+            sage = "limit(\(expr), \(v)=\(point))"
+        }
         let req = orderedUnique([v] + Variables.freeVariables(in: "\(expr) \(point)", bound: [v]))
         return .success(generatedSage: sage, requiredVariables: req)
     }
@@ -458,6 +513,43 @@ public enum FriendlyCompiler {
         let sage = "taylor(\(expr), \(v), \(pt), \(order))"
         let req = orderedUnique([v] + Variables.freeVariables(in: "\(expr) \(pt)", bound: [v]))
         return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: sum / product
+
+    /// `sum EXPR, VAR=LO..HI` → `sum(EXPR, VAR, LO, HI)`; same shape for product.
+    /// Mirrors the definite-integral branch: split on top-level commas, first part
+    /// is the summand/factor, then exactly one range clause. Lowercase symbolic
+    /// `sum`/`product` are the correct Sage forms (sum(k^2, k, 1, n) → ...).
+    private static func seriesRange(_ payload: String, sage fn: String, command: String) -> CompileResult {
+        let example = "Try: \(command) k^2, k=1..n"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`\(command)` needs an expression.",
+                suggestion: example
+            ))
+        }
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count <= 1 else {
+            return .error(CompileError(
+                message: "`\(command)` takes one range `k=1..n` (got \(rangeClauses.count)).",
+                suggestion: example
+            ))
+        }
+        guard let clause = rangeClauses.first else {
+            return .error(CompileError(
+                message: "`\(command)` needs a range `k=1..n`.",
+                suggestion: example
+            ))
+        }
+        guard let r = parseRange(clause) else {
+            return .error(rangeError(clause, example: "k=1..n"))
+        }
+        let generated = "\(fn)(\(expr), \(r.variable), \(r.lower), \(r.upper))"
+        let req = orderedUnique([r.variable] + Variables.freeVariables(
+            in: "\(expr) \(r.lower) \(r.upper)", bound: [r.variable]))
+        return .success(generatedSage: generated, requiredVariables: req)
     }
 
     // MARK: - Form: plot

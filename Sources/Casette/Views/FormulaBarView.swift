@@ -17,6 +17,14 @@ struct FormulaBarView: View {
             UnaryFormulaBar(model: model, formula: ir)
         case let .solve(ir):
             SolveFormulaBar(model: model, formula: ir)
+        case let .derivative(ir):
+            DerivativeFormulaBar(model: model, formula: ir)
+        case let .limit(ir):
+            LimitFormulaBar(model: model, formula: ir)
+        case let .taylor(ir):
+            TaylorFormulaBar(model: model, formula: ir)
+        case let .seriesRange(ir):
+            SeriesRangeFormulaBar(model: model, formula: ir)
         }
     }
 }
