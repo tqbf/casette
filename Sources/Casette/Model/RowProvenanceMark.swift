@@ -12,7 +12,9 @@ import Foundation
 /// `ShellModel` keeps the transient set of row IDs that arrived via restore
 /// and derives the mark from membership + the persisted provenance kind.
 enum RowProvenanceMark: Equatable {
-    /// Loaded from the last session's file — Sage was not involved.
+    /// Loaded from the last session's file — visible on the tape, but not
+    /// present in the current Sage namespace until Replay Session recomputes
+    /// it.
     case cached
     /// Recomputed by Replay Session (re-sent into a fresh worker).
     case replayed
@@ -20,7 +22,7 @@ enum RowProvenanceMark: Equatable {
     /// The quiet tag text shown next to the row's timestamp.
     var label: String {
         switch self {
-        case .cached: "cached"
+        case .cached: "not live"
         case .replayed: "replayed"
         }
     }
@@ -29,7 +31,7 @@ enum RowProvenanceMark: Equatable {
     var help: String {
         switch self {
         case .cached:
-            "Restored from your last session — this result was not recomputed."
+            "Restored from your last session — visible here, but not live in Sage until you replay the session."
         case .replayed:
             "Recomputed by Replay Session in a fresh Sage worker."
         }
@@ -38,7 +40,7 @@ enum RowProvenanceMark: Equatable {
     /// The Inspector's "Source" field text.
     var inspectorDescription: String {
         switch self {
-        case .cached: "Cached (restored from the last session)"
+        case .cached: "Restored cache (not live in the current Sage session)"
         case .replayed: "Replayed (recomputed this session)"
         }
     }

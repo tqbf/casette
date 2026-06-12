@@ -9,6 +9,7 @@ import SwiftUI
 struct PlotMissingView: View {
     /// The worker's per-format save error, when the PNG never saved.
     let saveError: String?
+    let canRerun: Bool
     let onRerun: () -> Void
 
     var body: some View {
@@ -30,7 +31,8 @@ struct PlotMissingView: View {
                     // Stays its own element so assistive tech can activate it.
                     Button("Rerun", systemImage: "arrow.clockwise", action: onRerun)
                         .controlSize(.small)
-                        .help("Re-evaluate this row to regenerate the plot")
+                        .disabled(!canRerun)
+                        .help(canRerun ? "Re-evaluate this row to regenerate the plot" : "Replay the session before regenerating restored plots")
                 }
                 .padding(Theme.rowPaddingHorizontal)
             }
@@ -47,8 +49,12 @@ struct PlotMissingView: View {
 
 #Preview {
     VStack(alignment: .leading, spacing: 16) {
-        PlotMissingView(saveError: nil, onRerun: {})
-        PlotMissingView(saveError: "OSError: [Errno 28] No space left on device", onRerun: {})
+        PlotMissingView(saveError: nil, canRerun: true, onRerun: {})
+        PlotMissingView(
+            saveError: "OSError: [Errno 28] No space left on device",
+            canRerun: true,
+            onRerun: {}
+        )
     }
     .padding()
 }

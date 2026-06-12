@@ -185,6 +185,14 @@ final class ShellModel {
         return row.provenance.kind == .replayed ? .replayed : .cached
     }
 
+    /// Whether row-derived commands can honestly run against the current Sage
+    /// namespace. Restored cached rows are render-ready tape history, but they
+    /// were not recomputed after launch; Replay Session is what makes them
+    /// live again.
+    func rowIsLiveInKernel(_ row: SessionRow) -> Bool {
+        provenanceMark(for: row) != .cached
+    }
+
     /// Saves the session atomically (temp-write + rename — the V0.10
     /// pattern), called after EVERY row mutation and header change, so a
     /// crash at any moment leaves a complete file up to the last completed
@@ -585,6 +593,7 @@ final class ShellModel {
     /// not the toggle's current state — rerun reproduces the original).
     func rerun(rowID: SessionRow.ID) {
         guard let row = session.rows.first(where: { $0.id == rowID }) else { return }
+        guard rowIsLiveInKernel(row) else { return }
         let numeric = row.numeric == true
         switch CompiledInput.compile(row.input) {
         case let .ready(compiled):
@@ -603,7 +612,12 @@ final class ShellModel {
     /// Actions tab primary click: submits an action's built command directly
     /// (the context-menu insert path is just `insertIntoDraft`) and selects
     /// the new row so the Inspector and Actions follow the fresh result.
-    func evaluateActionCommand(_ command: String) {
+    func evaluateActionCommand(_ command: String, sourceRowID: SessionRow.ID? = nil) {
+        if let sourceRowID,
+           let row = session.rows.first(where: { $0.id == sourceRowID }),
+           !rowIsLiveInKernel(row) {
+            return
+        }
         guard let rowID = submitProgrammatically(command) else { return }
         select(rowID)
     }
@@ -615,9 +629,10 @@ final class ShellModel {
     /// results, right on the card.
     func approximateNumerically(rowID: SessionRow.ID) {
         guard let row = session.rows.first(where: { $0.id == rowID }),
+              rowIsLiveInKernel(row),
               let command = row.approximateCommand
         else { return }
-        evaluateActionCommand(command)
+        evaluateActionCommand(command, sourceRowID: rowID)
     }
 
     // MARK: - History navigation (Up/Down)

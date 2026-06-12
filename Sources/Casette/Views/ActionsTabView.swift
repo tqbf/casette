@@ -13,10 +13,17 @@ struct ActionsTabView: View {
     var body: some View {
         if let row, let result = row.result, !result.actions.isEmpty {
             let expression = row.reusableExpression
+            let canRunCommands = model.rowIsLiveInKernel(row)
             List {
                 Section {
                     ForEach(ResultAction.actions(for: result)) { action in
-                        actionRow(action, result: result, expression: expression)
+                        actionRow(
+                            action,
+                            rowID: row.id,
+                            result: result,
+                            expression: expression,
+                            canRunCommands: canRunCommands
+                        )
                             .listRowSeparator(.hidden)
                     }
                 }
@@ -54,17 +61,24 @@ struct ActionsTabView: View {
     @ViewBuilder
     private func actionRow(
         _ action: ResultAction,
+        rowID: SessionRow.ID,
         result: PersistedEnvelope,
-        expression: String?
+        expression: String?,
+        canRunCommands: Bool
     ) -> some View {
         switch action.behavior {
         case .command:
-            if let expression, let command = action.command(wrapping: expression) {
+            if !canRunCommands {
+                ActionRowView(
+                    title: action.title,
+                    disabledReason: "Replay the session before running actions from restored rows."
+                )
+            } else if let expression, let command = action.command(wrapping: expression) {
                 ActionRowView(
                     title: action.title,
                     command: command,
                     onInsert: { insert(command) },
-                    onEvaluate: { model.evaluateActionCommand(command) }
+                    onEvaluate: { model.evaluateActionCommand(command, sourceRowID: rowID) }
                 )
             } else {
                 ActionRowView(

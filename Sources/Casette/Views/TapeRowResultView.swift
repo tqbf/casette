@@ -13,6 +13,9 @@ import SwiftUI
 struct TapeRowResultView: View {
     let row: SessionRow
     let isKernelConnected: Bool
+    /// False for restored cached rows; copy/read are fine, but commands that
+    /// depend on the current Sage namespace should wait for Replay Session.
+    let canRunRowActions: Bool
     /// Re-evaluates this row (a fresh tape row via the History rerun path) —
     /// the plot card's regenerate affordance for missing artifacts (V1.7).
     let onRerun: () -> Void
@@ -48,7 +51,12 @@ struct TapeRowResultView: View {
         case .plot:
             stdoutAndThen {
                 if let result = row.result {
-                    PlotCardView(result: result, title: row.input, onRerun: onRerun)
+                    PlotCardView(
+                        result: result,
+                        title: row.input,
+                        canRerun: canRunRowActions,
+                        onRerun: onRerun
+                    )
                 }
             }
         case .scalarExact, .scalarApproximate, .symbolic, .matrix, .list, .text:
@@ -92,7 +100,12 @@ struct TapeRowResultView: View {
 #Preview {
     VStack(alignment: .leading, spacing: 16) {
         ForEach(PlaceholderData.rows) { row in
-            TapeRowResultView(row: row, isKernelConnected: false, onRerun: {})
+            TapeRowResultView(
+                row: row,
+                isKernelConnected: false,
+                canRunRowActions: true,
+                onRerun: {}
+            )
         }
     }
     .padding()

@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 /// never saved shows the honest missing state with a Rerun affordance.
 struct PlotImageWell: View {
     let rendition: PlotRendition
+    let canRerun: Bool
     let onRerun: () -> Void
     /// Click-to-expand: called with the decoded full-resolution image.
     let onZoom: (PlotZoomItem) -> Void
@@ -29,7 +30,11 @@ struct PlotImageWell: View {
             if let image {
                 loadedImage(image)
             } else if rendition.path == nil || loadFailed {
-                PlotMissingView(saveError: rendition.saveError, onRerun: onRerun)
+                PlotMissingView(
+                    saveError: rendition.saveError,
+                    canRerun: canRerun,
+                    onRerun: onRerun
+                )
             } else {
                 loadingPlaceholder
             }

@@ -4,6 +4,7 @@ import SwiftUI
 /// into the input; the context menu adds rerun and copy.
 struct HistoryRowView: View {
     let row: SessionRow
+    let canRerun: Bool
     let onInsert: () -> Void
     let onRerun: () -> Void
 
@@ -23,9 +24,14 @@ struct HistoryRowView: View {
         .onTapGesture(count: 2, perform: onInsert)
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Insert into Input", onInsert)
-        .accessibilityAction(named: "Rerun", onRerun)
+        .accessibilityAction(named: "Rerun") {
+            guard canRerun else { return }
+            onRerun()
+        }
         .contextMenu {
             Button("Rerun", action: onRerun)
+                .disabled(!canRerun)
+                .help(canRerun ? "Re-evaluate this row" : "Replay the session before rerunning restored rows")
             Button("Insert into Input", action: onInsert)
             Button("Copy") { Pasteboard.copy(row.input) }
         }
@@ -35,7 +41,7 @@ struct HistoryRowView: View {
 
 #Preview {
     List(PlaceholderData.rows) { row in
-        HistoryRowView(row: row, onInsert: {}, onRerun: {})
+        HistoryRowView(row: row, canRerun: true, onInsert: {}, onRerun: {})
     }
     .frame(width: 280, height: 300)
 }
