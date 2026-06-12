@@ -25,6 +25,12 @@ struct FormulaBarView: View {
             TaylorFormulaBar(model: model, formula: ir)
         case let .seriesRange(ir):
             SeriesRangeFormulaBar(model: model, formula: ir)
+        case let .plot(ir):
+            PlotFormulaBar(model: model, formula: ir)
+        case let .implicitPlot(ir):
+            ImplicitPlotFormulaBar(model: model, formula: ir)
+        case let .parametricPlot(ir):
+            ParametricPlotFormulaBar(model: model, formula: ir)
         }
     }
 }

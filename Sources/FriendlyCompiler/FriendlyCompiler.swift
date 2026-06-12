@@ -71,6 +71,8 @@ public enum FriendlyCompiler {
         case .limit:        return limitForm(rest)
         case .taylor:       return taylor(rest)
         case .plot:         return plot(rest)
+        case .implicitPlot: return implicitPlot(rest)
+        case .parametricPlot: return parametricPlot(rest)
         case .sum:          return seriesRange(rest, sage: "sum", command: "sum")
         case .product:      return seriesRange(rest, sage: "product", command: "product")
         case .matrix:       return matrixForm(rest)
@@ -84,6 +86,7 @@ public enum FriendlyCompiler {
     enum Keyword: CaseIterable {
         case factor, expand, simplify, solve, derivative
         case integral, doubleIntegral, limit, taylor, plot
+        case implicitPlot, parametricPlot
         case sum, product
         case matrix, eigenvalues, rref
 
@@ -101,6 +104,8 @@ public enum FriendlyCompiler {
             case .limit: return ["limit"]
             case .taylor: return ["taylor"]
             case .plot: return ["plot"]
+            case .implicitPlot: return ["implicit_plot", "implicit plot"]
+            case .parametricPlot: return ["parametric_plot", "parametric plot"]
             case .sum: return ["sum"]
             case .product: return ["product"]
             case .matrix: return ["matrix"]
@@ -123,6 +128,8 @@ public enum FriendlyCompiler {
             case .limit: return "Try: limit sin(x)/x, x->0"
             case .taylor: return "Try: taylor sin(x), x=0, order=7"
             case .plot: return "Try: plot sin(x), x=-pi..pi"
+            case .implicitPlot: return "Try: implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2"
+            case .parametricPlot: return "Try: parametric_plot (cos(t), sin(t)), t=0..2*pi"
             case .sum: return "Try: sum k^2, k=1..n"
             case .product: return "Try: product 1 + 1/k, k=1..n"
             case .matrix: return "Try: matrix [1,2; 3,4]"
@@ -576,6 +583,106 @@ public enum FriendlyCompiler {
         let sage = "plot(\(expr), (\(r.variable), \(r.lower), \(r.upper)))"
         let req = orderedUnique([r.variable] + Variables.freeVariables(
             in: "\(expr) \(r.lower) \(r.upper)", bound: [r.variable]))
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: implicit_plot
+
+    /// `implicit_plot EQUATION, X=LO..HI, Y=LO..HI`
+    ///   → `implicit_plot(LHS == RHS, (x, xlo, xhi), (y, ylo, yhi))`
+    /// The equation translates a single top-level `=` to `==`; a bare expression
+    /// (no equals at all) normalizes to `EXPR == 0`. Exactly two ranges required;
+    /// the per-range errors mirror the double-integral branch.
+    private static func implicitPlot(_ payload: String) -> CompileResult {
+        let example = "Try: implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let rawEquation = parts.first?.trimmedShim, !rawEquation.isEmpty else {
+            return .error(CompileError(
+                message: "`implicit_plot` needs an equation.",
+                suggestion: example
+            ))
+        }
+        // Normalize the equation: `=` → `==`, `==` passes through, no equals →
+        // `EXPR == 0`.
+        let relation: String
+        if rawEquation.contains("==") {
+            relation = rawEquation
+        } else if let eq = splitEquation(rawEquation) {
+            relation = "\(eq.lhs) == \(eq.rhs)"
+        } else {
+            relation = "\(rawEquation) == 0"
+        }
+
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count == 2 else {
+            return .error(CompileError(
+                message: "`implicit_plot` needs two ranges (`x=...`, then `y=...`).",
+                suggestion: example
+            ))
+        }
+        guard let xRange = parseRange(rangeClauses[0]) else {
+            return .error(rangeError(rangeClauses[0], example: "x=-2..2"))
+        }
+        guard let yRange = parseRange(rangeClauses[1]) else {
+            return .error(rangeError(rangeClauses[1], example: "y=-2..2"))
+        }
+        let sage = "implicit_plot(\(relation), "
+            + "(\(xRange.variable), \(xRange.lower), \(xRange.upper)), "
+            + "(\(yRange.variable), \(yRange.lower), \(yRange.upper)))"
+        var req = Variables.freeVariables(
+            in: "\(relation) \(xRange.lower) \(xRange.upper) \(yRange.lower) \(yRange.upper)",
+            bound: [xRange.variable, yRange.variable]
+        )
+        req = orderedUnique([xRange.variable, yRange.variable] + req)
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: parametric_plot
+
+    /// `parametric_plot (XEXPR, YEXPR), VAR=LO..HI`
+    ///   → `parametric_plot((XEXPR, YEXPR), (VAR, LO, HI))`
+    /// The parenthesized pair is one top-level unit; exactly one range required.
+    private static func parametricPlot(_ payload: String) -> CompileResult {
+        let example = "Try: parametric_plot (cos(t), sin(t)), t=0..2*pi"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let pairText = parts.first?.trimmedShim, !pairText.isEmpty else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        // Validate the parenthesized pair: outer parens, exactly two non-empty
+        // top-level pieces inside.
+        guard pairText.hasPrefix("("), pairText.hasSuffix(")") else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        let inner = String(pairText.dropFirst().dropLast())
+        let coords = Scanner.splitTopLevelCommas(inner).map { $0.trimmedShim }
+        guard coords.count == 2, coords.allSatisfy({ !$0.isEmpty }) else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        let xExpr = coords[0]
+        let yExpr = coords[1]
+
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count == 1 else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs one range `var=a..b`.",
+                suggestion: example
+            ))
+        }
+        guard let r = parseRange(rangeClauses[0]) else {
+            return .error(rangeError(rangeClauses[0], example: "t=0..2*pi"))
+        }
+        let sage = "parametric_plot((\(xExpr), \(yExpr)), (\(r.variable), \(r.lower), \(r.upper)))"
+        let req = orderedUnique([r.variable] + Variables.freeVariables(
+            in: "\(xExpr) \(yExpr) \(r.lower) \(r.upper)", bound: [r.variable]))
         return .success(generatedSage: sage, requiredVariables: req)
     }
 

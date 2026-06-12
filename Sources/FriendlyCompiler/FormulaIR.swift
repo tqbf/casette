@@ -15,6 +15,9 @@ public enum FormulaIR: Equatable, Sendable {
     case limit(LimitFormulaIR)
     case taylor(TaylorFormulaIR)
     case seriesRange(SeriesRangeFormulaIR)
+    case plot(PlotFormulaIR)
+    case implicitPlot(ImplicitPlotFormulaIR)
+    case parametricPlot(ParametricPlotFormulaIR)
 
     public static func parse(_ draft: String) -> FormulaIR? {
         // Families are keyed by disjoint leading commands, so order is cosmetic.
@@ -25,6 +28,9 @@ public enum FormulaIR: Equatable, Sendable {
         if let ir = LimitFormulaIR.parse(draft) { return .limit(ir) }
         if let ir = TaylorFormulaIR.parse(draft) { return .taylor(ir) }
         if let ir = SeriesRangeFormulaIR.parse(draft) { return .seriesRange(ir) }
+        if let ir = ImplicitPlotFormulaIR.parse(draft) { return .implicitPlot(ir) }
+        if let ir = ParametricPlotFormulaIR.parse(draft) { return .parametricPlot(ir) }
+        if let ir = PlotFormulaIR.parse(draft) { return .plot(ir) }
         return nil
     }
 
@@ -37,6 +43,9 @@ public enum FormulaIR: Equatable, Sendable {
         case let .limit(ir): return ir.friendlyInput
         case let .taylor(ir): return ir.friendlyInput
         case let .seriesRange(ir): return ir.friendlyInput
+        case let .plot(ir): return ir.friendlyInput
+        case let .implicitPlot(ir): return ir.friendlyInput
+        case let .parametricPlot(ir): return ir.friendlyInput
         }
     }
 }

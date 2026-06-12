@@ -388,6 +388,48 @@ struct ShellModelInputTests {
         #expect(model.draftPreview == .generated("limit(sin(x)/x, x=0, dir='+')"))
     }
 
+    @Test("plot formula bar model rewrites friendly IR with filled bounds")
+    func plotFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "plot sin(x)"
+        guard var formula = model.plotFormula else {
+            Issue.record("expected plot formula")
+            return
+        }
+        #expect(formula.expression == "sin(x)")
+        #expect(formula.variable == "x")  // inferred single free var
+
+        formula.lowerBound = "-pi"
+        formula.upperBound = "pi"
+        model.updateFormula(.plot(formula))
+        #expect(model.draft == "plot sin(x), x=-pi..pi")
+        #expect(model.plotFormula?.lowerBound == "-pi")
+        #expect(model.plotFormula?.upperBound == "pi")
+        #expect(model.draftPreview == .generated("plot(sin(x), (x, -pi, pi))"))
+    }
+
+    @Test("implicit-plot formula bar model rewrites friendly IR with filled ranges")
+    func implicitPlotFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "implicit_plot x^2 + y^2 = 1"
+        guard var formula = model.implicitPlotFormula else {
+            Issue.record("expected implicit-plot formula")
+            return
+        }
+        #expect(formula.equation == "x^2 + y^2 = 1")
+
+        formula.xLower = "-2"
+        formula.xUpper = "2"
+        formula.yLower = "-2"
+        formula.yUpper = "2"
+        model.updateFormula(.implicitPlot(formula))
+        #expect(model.draft == "implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2")
+        #expect(model.implicitPlotFormula?.xUpper == "2")
+        #expect(model.implicitPlotFormula?.yLower == "-2")
+        #expect(model.draftPreview == .generated(
+            "implicit_plot(x^2 + y^2 == 1, (x, -2, 2), (y, -2, 2))"))
+    }
+
     @Test("tape references use visible row numbers but only successful reusable rows are valid")
     func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
         let rows = [

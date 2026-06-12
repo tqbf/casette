@@ -517,6 +517,21 @@ final class ShellModel {
         return ir
     }
 
+    var plotFormula: PlotFormulaIR? {
+        guard case let .plot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var implicitPlotFormula: ImplicitPlotFormulaIR? {
+        guard case let .implicitPlot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var parametricPlotFormula: ParametricPlotFormulaIR? {
+        guard case let .parametricPlot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }
