@@ -56,6 +56,10 @@ final class SageKernel: KernelTransport, @unchecked Sendable {
 
     // MARK: - KernelTransport
 
+    /// The binary this kernel runs — lets the controller report the in-use
+    /// Sage (the V1.10 session-header `sageVersion` fill).
+    var sageBinaryPath: String? { sagePath }
+
     func setEOFHandler(_ handler: @escaping @Sendable () -> Void) {
         wire.setEOFHandler(handler)
     }

@@ -37,6 +37,13 @@ struct SageCommands: Commands {
 
             Divider()
 
+            Button("Sage Doctor…") {
+                model?.openDoctor()
+            }
+            .disabled(model == nil)
+
+            Divider()
+
             Button("Interrupt Evaluation") {
                 model?.interruptEvaluation()
             }

@@ -10,6 +10,7 @@ import SwiftUI
 /// back to the input.
 struct RootView: View {
     @State private var model = ShellModel()
+    @State private var doctorModel = DoctorModel()
     /// Sidebar visibility persists across launches (V1.9 "remember UI
     /// layout") — `@AppStorage` is the lightweight macOS idiom for it; the
     /// projected binding drives `.inspector` and the ⌘B command unchanged.
@@ -25,6 +26,7 @@ struct RootView: View {
     var connectsKernel = true
 
     var body: some View {
+        @Bindable var model = model
         VStack(spacing: 0) {
             SessionTapeView(model: model)
             Divider()
@@ -33,7 +35,12 @@ struct RootView: View {
             // conditional — no transition (SWIFTUI-RULES §1.1 is about
             // animated insert/remove).
             if let issue = model.kernelIssue {
-                KernelIssueBanner(message: issue) { model.restartKernel() }
+                KernelIssueBanner(
+                    message: issue,
+                    isSetupFailure: model.kernelSetupFailed,
+                    restart: model.restartKernel,
+                    openDoctor: model.openDoctor
+                )
                 Divider()
             }
             InputPaneView(model: model, isFocused: $isInputFocused)
@@ -60,6 +67,9 @@ struct RootView: View {
         .focusedSceneValue(\.isSidebarPresented, $isSidebarPresented)
         .focusedSceneValue(\.shellModel, model)
         .defaultFocus($isInputFocused, true)
+        .sheet(isPresented: $model.isDoctorPresented) {
+            DoctorSheetView(model: doctorModel, reconnect: model.restartKernel)
+        }
         .onChange(of: model.sidebarTab) {
             storedSidebarTab = model.sidebarTab.rawValue
         }

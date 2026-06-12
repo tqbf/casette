@@ -45,4 +45,13 @@ protocol KernelTransport: AnyObject, Sendable {
 
     /// Best-effort: is the spawned (wrapper) process still alive?
     func isAlive() -> Bool
+
+    /// The Sage binary this transport runs, when known. Real kernels report
+    /// it (V1.10 fills the session header's `sageVersion` from it and the
+    /// Doctor shows it); fakes default to nil via the extension below.
+    var sageBinaryPath: String? { get }
+}
+
+extension KernelTransport {
+    var sageBinaryPath: String? { nil }
 }

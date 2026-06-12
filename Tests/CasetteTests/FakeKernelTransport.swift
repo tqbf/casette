@@ -19,6 +19,7 @@ final class FakeKernelTransport: KernelTransport, @unchecked Sendable {
     /// Runs when the controller sends SIGINT (e.g. enqueue an interrupted
     /// envelope to simulate cysignals honoring it). nil = SIGINT swallowed.
     var respondToInterrupt: (@Sendable (FakeKernelTransport) -> Void)?
+    var reportedSageBinaryPath: String?
 
     // Recorded signals.
     private var _sentIDs: [String] = []
@@ -80,6 +81,8 @@ final class FakeKernelTransport: KernelTransport, @unchecked Sendable {
     }
 
     var isAtEOF: Bool { wire.isAtEOF }
+
+    var sageBinaryPath: String? { reportedSageBinaryPath }
 
     func spawn() throws {
         if let bannerOnSpawn {

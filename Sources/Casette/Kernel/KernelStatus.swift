@@ -10,4 +10,9 @@ struct KernelStatus: Equatable, Sendable {
     /// should see (no Sage found, worker crashed, force-stopped). Cleared by
     /// a successful connect/restart.
     var issue: String?
+    /// True when the issue is a SETUP failure (no Sage found, worker script
+    /// missing — a `KernelSetupError`) rather than a runtime crash. Drives
+    /// the banner's recovery affordance: setup failures lead with the Sage
+    /// Doctor (V1.10); runtime crashes lead with Restart Sage.
+    var isSetupFailure: Bool = false
 }

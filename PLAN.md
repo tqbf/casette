@@ -56,6 +56,29 @@ No Xcode IDE, no xcodebuild, no XcodeGen — Xcode is only a toolchain provider.
 
 ## Status
 
+**V1.10 done — Sage Doctor is in the app.** The app now has a standard
+macOS **Sage ▸ Sage Doctor…** sheet that reuses the frozen V0.9 discovery,
+version, report, and check contract in-process instead of forking a parallel
+diagnostic stack. The sheet shows the selected/stored Sage binary, manual
+path override with native **Choose Sage…**, discovery candidates, live check
+rows, and a **Copy Report** action that includes both the human summary and
+the stable JSON contract. Missing/setup failures are now tagged distinctly
+from runtime crashes (`KernelStatus.isSetupFailure`), so the recovery banner
+leads with **Open Sage Doctor** for no-Sage/broken-build cases while runtime
+crashes still lead with Restart Sage. The controller reports the active Sage
+binary, and `ShellModel` fills the session header's formerly-nil
+`sageVersion` asynchronously from `sage --version` without blocking boot.
+The Doctor's worker checks run through the app's real `KernelTransport` /
+`SageKernel` seam, preserving the V0.9 no-orphan process-control lessons.
+`make check` / **`make test` 285/285** (+7: Doctor model ×4, runner ×2,
+real-Sage full Doctor checklist ×1) / `make build` green. Live launch
+confirmed the new menu item and the Doctor sheet window; Computer Use can
+read the main app/menu but currently returns `remoteConnection` once the
+sheet is open, so the sheet-open proof used the OS window list fallback
+(main window + 680×560 Doctor sheet visible). **Next: V1.11 — Result
+Actions** (already partially present from V1.6; reconcile the plan before
+building forward).
+
 **V1.9 done (live gate PASSED, all 11 checks) — the app feels persistent
 without becoming document-oriented.** Quit/relaunch restores the visible tape from ONE
 pretty-printed `last-session.json` (`~/Library/Application

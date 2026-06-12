@@ -154,6 +154,9 @@ struct ShellModelKernelTests {
             })
         #expect(await eventually { @MainActor in model.kernelState == .notConnected && model.kernelIssue != nil })
         #expect(model.kernelIssue?.contains("SageMath") == true)
+        #expect(model.kernelSetupFailed == true)
+        model.openDoctor()
+        #expect(model.isDoctorPresented == true)
 
         // Submitting against the dead kernel yields a readable error row,
         // not a forever-spinner.

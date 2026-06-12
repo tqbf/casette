@@ -37,6 +37,13 @@ final class ShellModel {
     /// Honest, user-facing reason the kernel is unavailable (no Sage found,
     /// crash, forced stop) — drives the recovery banner. nil when healthy.
     private(set) var kernelIssue: String?
+    /// True when `kernelIssue` is a SETUP failure (no Sage found, worker
+    /// missing) rather than a runtime crash — the banner then leads with the
+    /// Sage Doctor (V1.10's "missing Sage path opens Sage Doctor" hook).
+    private(set) var kernelSetupFailed = false
+    /// Presents the Sage Doctor sheet (the Sage menu item and the kernel
+    /// banner both open it). Transient UI state, never persisted.
+    var isDoctorPresented = false
     var selectedRowID: SessionRow.ID?
     /// Which sidebar tab is showing. Transient UI state (like selection),
     /// model-owned so sidebar flows can switch tabs (Symbols → Inspect lands
@@ -261,16 +268,53 @@ final class ShellModel {
                 guard let self else { return }
                 kernelState = status.state
                 kernelIssue = status.issue
+                kernelSetupFailed = status.isSetupFailure
             }
         }
         enqueueKernelWork { [weak self] in
             await controller.connect()
+            self?.scheduleSageVersionRefresh()
             _ = await controller.evaluate(Self.bootPrelude)
             if let digits = self?.precisionNeedingReapply {
                 _ = await controller.configure(precisionDigits: digits)
             }
             await self?.refreshSymbols()
         }
+    }
+
+    // MARK: - Sage Doctor (V1.10)
+
+    /// Opens the Sage Doctor sheet — the Sage menu item and the kernel
+    /// banner's recovery action both land here.
+    func openDoctor() {
+        isDoctorPresented = true
+    }
+
+    /// Probes a Sage binary's version for the session header. Injectable so
+    /// fake-transport tests never spawn `sage --version`; the default runs
+    /// the same bounded detector the Doctor uses.
+    @ObservationIgnored var sageVersionProbe: @Sendable (String) async -> String? = { path in
+        await SageVersionDetector.detect(sagePath: path).displayVersion
+    }
+
+    /// Fills the session header's `sageVersion` (nil since V0.10 — V1.10's
+    /// criterion) from the CURRENT worker's binary. Runs un-chained off the
+    /// kernel queue: the probe spawns `sage --version` (~1s) and must never
+    /// delay the first evaluation; the header write lands whenever it lands.
+    private func scheduleSageVersionRefresh() {
+        guard let controller else { return }
+        Task { [weak self, probe = sageVersionProbe] in
+            guard let path = await controller.currentSagePath else { return }
+            guard let version = await probe(path) else { return }
+            self?.recordSageVersion(version)
+        }
+    }
+
+    private func recordSageVersion(_ version: String) {
+        guard session.sageVersion != version else { return }
+        session.sageVersion = version
+        session.updated = .now
+        persist()  // a header change is a session change (V1.9)
     }
 
     /// Intentionally resets the session's Sage state: kills the worker,
@@ -296,6 +340,7 @@ final class ShellModel {
         let restart = Task { await controller.restart() }
         enqueueKernelWork { [weak self] in
             await restart.value
+            self?.scheduleSageVersionRefresh()  // the binary may have changed (Doctor)
             _ = await controller.evaluate(Self.bootPrelude)
             if let digits = self?.precisionNeedingReapply {
                 _ = await controller.configure(precisionDigits: digits)

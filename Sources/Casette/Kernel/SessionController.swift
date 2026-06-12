@@ -53,6 +53,10 @@ actor SessionController {
 
     private(set) var state: KernelState = .notConnected
     private(set) var issue: String?
+    /// The Sage binary the CURRENT worker generation runs (from the
+    /// transport), or nil with no live worker / a fake transport. V1.10 uses
+    /// it to fill the session header's `sageVersion` after boot.
+    private(set) var currentSagePath: String?
 
     private let configuration: Configuration
     private let makeTransport: TransportFactory
@@ -345,10 +349,16 @@ actor SessionController {
             try kernel.spawn()
         } catch {
             logger.error("kernel setup failed: \(String(describing: error), privacy: .public)")
-            setStatus(.notConnected, issue: String(describing: error))
+            // Setup failures (no Sage, no worker script) are flagged so the
+            // banner can lead with the Sage Doctor instead of a blind restart.
+            setStatus(
+                .notConnected,
+                issue: String(describing: error),
+                setupFailure: error is KernelSetupError)
             return
         }
         transport = kernel
+        currentSagePath = kernel.sageBinaryPath
 
         // Await the ready banner (carries the worker's REAL pid — the
         // SIGINT target; the spawned pid is just the bash wrapper).
@@ -434,6 +444,7 @@ actor SessionController {
         generation += 1
         transport?.hardKill()
         transport = nil
+        currentSagePath = nil
     }
 
     /// Idle crash detection: the generation's EOF callback lands here. The
@@ -458,10 +469,13 @@ actor SessionController {
         }
     }
 
-    private func setStatus(_ newState: KernelState, issue newIssue: String?) {
+    private func setStatus(
+        _ newState: KernelState, issue newIssue: String?, setupFailure: Bool = false
+    ) {
         state = newState
         issue = newIssue
-        statusContinuation.yield(KernelStatus(state: newState, issue: newIssue))
+        statusContinuation.yield(
+            KernelStatus(state: newState, issue: newIssue, isSetupFailure: setupFailure))
         logger.info("kernel state → \(newState.rawValue, privacy: .public)")
     }
 
