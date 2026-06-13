@@ -140,3 +140,21 @@ struct TruncationDisplayTests {
         #expect(!text.contains("truncation\""))
     }
 }
+
+@Suite("Stdout display cap")
+struct StdoutDisplayCapTests {
+    @Test("small stdout renders unchanged except trailing newlines")
+    func smallStdout() {
+        let preview = StdoutBlockView.preview(for: "hello\n")
+        #expect(preview.text == "hello")
+        #expect(preview.note == nil)
+    }
+
+    @Test("large stdout renders a bounded preview")
+    func largeStdout() {
+        let stdout = String(repeating: "x", count: StdoutBlockView.displayCharacterLimit + 10)
+        let preview = StdoutBlockView.preview(for: stdout)
+        #expect(preview.text.count == StdoutBlockView.displayCharacterLimit)
+        #expect(preview.note?.contains("10 omitted") == true)
+    }
+}
