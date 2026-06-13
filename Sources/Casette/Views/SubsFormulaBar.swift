@@ -32,7 +32,8 @@ struct SubsFormulaBar: View {
                     text: binding(
                         get: { $0.bindings },
                         set: { $0.bindings = $1 }),
-                    maxWidth: 220)
+                    maxWidth: 220,
+                    growsWithContent: true)
             }
             .fixedSize(horizontal: true, vertical: false)
         }

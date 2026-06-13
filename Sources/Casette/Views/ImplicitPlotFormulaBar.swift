@@ -19,7 +19,8 @@ struct ImplicitPlotFormulaBar: View {
                     // The equation carries a full `LHS = RHS`; give it the wider
                     // ceiling (like SubsFormulaBar's bindings token) so `= 1`
                     // isn't clipped off the visible token.
-                    maxWidth: 220)
+                    maxWidth: 220,
+                    growsWithContent: true)
 
                 // The x-axis range reads as one semantic group: `x  -2 .. 2`.
                 axisGroup(

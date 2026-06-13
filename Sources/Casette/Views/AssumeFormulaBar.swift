@@ -20,7 +20,8 @@ struct AssumeFormulaBar: View {
                     text: binding(
                         get: { $0.condition },
                         set: { $0.condition = $1 }),
-                    maxWidth: 220)
+                    maxWidth: 220,
+                    growsWithContent: true)
             }
             .fixedSize(horizontal: true, vertical: false)
         }

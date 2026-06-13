@@ -15,7 +15,9 @@ struct SolveFormulaBar: View {
                     prompt: "x^2 + 5*x + 6 = 0",
                     text: binding(
                         get: { $0.equation },
-                        set: { $0.equation = $1 }))
+                        set: { $0.equation = $1 }),
+                    maxWidth: 220,
+                    growsWithContent: true)
 
                 FormulaTokenField(
                     title: "for",
