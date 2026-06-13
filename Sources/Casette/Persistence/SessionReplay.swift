@@ -14,7 +14,7 @@ enum SessionReplay {
     ///
     /// Derived by recompiling the row's recorded input, exactly like rerun:
     /// a friendly row reports its `requiredVariables`; a raw-Sage bypass
-    /// reports none (the boot prelude's `x, y, z, t` plus the tape's own
+    /// reports none (the boot prelude's calculator variables plus the tape's own
     /// earlier assignments are its namespace, in order); an input that now
     /// compiles ambiguous uses its RECORDED resolution (`row.sage`), with
     /// variables re-derived by the compiler's own heuristic — replay never

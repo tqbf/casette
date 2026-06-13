@@ -18,6 +18,7 @@ enum UILayout {
     static let sidebarTabKey = "sidebarTab"
     static let inputPaneHeightKey = "inputPaneHeight"
     static let sidebarTopPaneHeightKey = "sidebarTopPaneHeight"
+    static let showBuiltinSymbolsKey = "showBuiltinSymbols"
 
     static let defaultInputPaneHeight: Double = 118
     static let defaultSidebarTopPaneHeight: Double = 52

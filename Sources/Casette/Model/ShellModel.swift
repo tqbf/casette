@@ -232,11 +232,17 @@ final class ShellModel {
     /// user reasonably expects `implicit_plot(x^2+y^2==1, (x,-2,2),
     /// (y,-2,2))`, parametric plots over `t`, and 3D examples over `y`/`z`
     /// to work out of the box, exactly as the upstream docs write them.
-    /// `var('x, y, z, t')` covers the conventional calculator variables; all
-    /// four honestly appear in the Symbols sidebar from boot. Declaring is
-    /// idempotent, so friendly `var('V')` preludes on top are harmless, and
-    /// worker.py stays byte-frozen (the prelude is app-side).
-    static let bootPrelude = "var('x, y, z, t')"
+    /// These names cover the conventional calculator variables plus common
+    /// coordinate subscripts. They honestly appear in the Symbols sidebar from
+    /// boot. Declaring is idempotent, so friendly `var('V')` preludes on top are
+    /// harmless, and worker.py stays byte-frozen (the prelude is app-side).
+    nonisolated static let bootVariableNames = [
+        "u", "v", "w", "x", "y", "z",
+        "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9",
+        "y1", "y2", "y3", "y4", "y5", "y6", "y7", "y8", "y9",
+        "t",
+    ]
+    nonisolated static let bootPrelude = "var('\(bootVariableNames.joined(separator: ", "))')"
 
     /// The worker's own default `precision_digits` (WORKER-PROTOCOL.md
     /// `config` op). A fresh worker boots at this value, so the boot/restart
@@ -278,7 +284,7 @@ final class ShellModel {
     }
 
     /// Attaches the kernel controller, starts watching its status stream,
-    /// and boots Sage (followed by the `var('x, y, z, t')` boot prelude and
+    /// and boots Sage (followed by the calculator-variable boot prelude and
     /// a symbol refresh). With no controller attached (previews, pure model
     /// tests) submissions stay honestly pending, exactly like V1.2.
     func connectKernel(_ controller: SessionController = SessionController()) {
@@ -342,7 +348,7 @@ final class ShellModel {
     /// boots a fresh one, re-applies the boot prelude (the fresh namespace
     /// gets the same calculator variables) AND the configured session
     /// precision (the fresh worker resets to 10 — V0.8 session state), and
-    /// refreshes the symbol table (back to `x, y, z, t`).
+    /// refreshes the symbol table back to the boot variables.
     ///
     /// Two-part ordering (the V1.8 fix for a latent race):
     ///   * The `restart()` call itself is NOT chained behind pending

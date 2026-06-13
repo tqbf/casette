@@ -158,9 +158,10 @@ structurally: pure offscreen `sizeThatFits` + change-guarded NSView writes
 in `SwiftMathRenderer`, and explicit computed `.frame(width:height:)`
 sizing in `PlotImageWell` via the pure, unit-tested `fittedDisplaySize`)
 and (2) **implicit_plot NameError'ing on `y` out of the box** (fixed:
-`ShellModel.bootPrelude` is now `var('x, y, z, t')` — a deliberate,
-documented deviation from strict REPL fidelity; plans/FRIENDLY-COMPILER.md
-Variable policy, V1.7). Tests now **236/236** (details in PROGRESS.md's
+`ShellModel.bootPrelude` predefines conventional calculator variables — a
+deliberate, documented deviation from strict REPL fidelity;
+plans/FRIENDLY-COMPILER.md Variable policy, V1.7). Tests now **236/236**
+(details in PROGRESS.md's
 fix-round section).
 Plot rows render the real PNG inline (bounded 280pt, aspect-preserving,
 never upscaled; **PNG only** — the frozen V0.5 verdict, SVG stays

@@ -57,14 +57,12 @@ struct RootView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: confirmClearTape) {
-                    Label("Clear Tape", systemImage: "trash")
-                        .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .disabled(!model.canClearTape)
-                .help("Clear all rows from the tape")
+                Button("Clear Tape", systemImage: "trash", action: confirmClearTape)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(!model.canClearTape)
+                    .help("Clear all rows from the tape")
 
                 Button(
                     "Hide or Show Sidebar",
@@ -76,6 +74,7 @@ struct RootView: View {
         }
         .focusedSceneValue(\.isSidebarPresented, $isSidebarPresented)
         .focusedSceneValue(\.shellModel, model)
+        .focusedSceneValue(\.confirmClearTape, confirmClearTape)
         .defaultFocus($isInputFocused, true)
         .sheet(isPresented: $model.isDoctorPresented) {
             DoctorSheetView(model: doctorModel, reconnect: model.restartKernel)

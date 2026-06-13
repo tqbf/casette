@@ -37,6 +37,7 @@ struct UILayoutPersistenceTests {
         defaults.set(SidebarTab.history.rawValue, forKey: UILayout.sidebarTabKey)
         defaults.set(156.0, forKey: UILayout.inputPaneHeightKey)
         defaults.set(64.0, forKey: UILayout.sidebarTopPaneHeightKey)
+        defaults.set(true, forKey: UILayout.showBuiltinSymbolsKey)
 
         // …is what a relaunch reads back.
         #expect(defaults.bool(forKey: UILayout.sidebarVisibleKey) == false)
@@ -45,6 +46,7 @@ struct UILayoutPersistenceTests {
                 == .history)
         #expect(defaults.double(forKey: UILayout.inputPaneHeightKey) == 156.0)
         #expect(defaults.double(forKey: UILayout.sidebarTopPaneHeightKey) == 64.0)
+        #expect(defaults.bool(forKey: UILayout.showBuiltinSymbolsKey))
     }
 
     @Test("split dimensions clamp so both panes stay usable")

@@ -77,12 +77,12 @@ struct ResultRenderingIntegrationTests {
         await controller.shutdown()
     }
 
-    @Test("x, y, z, t are predefined at boot and after restart — the calculator-variables prelude", .timeLimit(.minutes(5)))
+    @Test("calculator variables are predefined at boot and after restart", .timeLimit(.minutes(5)))
     func bootPreludeMatchesTheRealREPL() async {
         // Through the ShellModel seam, where the boot prelude lives: a
         // raw-Sage bypass over `x` (no friendly var('V') preludes) must work
         // straight after boot, exactly as in the real `sage` REPL — plus
-        // the V1.7 calculator-variables deviation (y, z, t too; see
+        // the calculator-variables deviation (see
         // plans/FRIENDLY-COMPILER.md).
         let controller = SessionController(transportFactory: SageTestEnvironment.factory)
         let model = ShellModel()
@@ -100,13 +100,13 @@ struct ResultRenderingIntegrationTests {
         // The sidebar honestly shows ALL the predefined calculator
         // variables (worker-sorted by name).
         #expect(await eventually { @MainActor in
-            model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
+            model.symbols.entries.map(\.name) == ShellModel.bootVariableNames.sorted()
         })
 
         // Restart resets the namespace; the prelude must be re-applied.
         model.restartKernel()
         #expect(await eventually(timeout: .seconds(120)) { @MainActor in
-            model.symbols.entries.map(\.name) == ["t", "x", "y", "z"]
+            model.symbols.entries.map(\.name) == ShellModel.bootVariableNames.sorted()
         })
         model.draft = "expand((x+1)^2)"
         model.submitDraft()

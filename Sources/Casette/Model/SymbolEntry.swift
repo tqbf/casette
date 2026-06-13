@@ -10,6 +10,16 @@ struct SymbolEntry: Identifiable, Equatable, Sendable {
 
     var id: String { name }
 
+    /// The app's boot prelude declares conventional calculator symbols so raw
+    /// Sage works out of the box. When the Symbols tab hides built-ins, hide
+    /// only those untouched symbolic entries; if a user reassigns `x = 5`, it
+    /// is user state and should remain visible.
+    var isUntouchedBootVariable: Bool {
+        ShellModel.bootVariableNames.contains(name)
+            && kind.contains("symbolic")
+            && summary == name
+    }
+
     /// Kinds whose V0.6 summary IS the literal value (a bounded repr), so a
     /// `name = summary` snippet is real, pasteable Sage.
     private static let valueKinds: Set<String> = [
