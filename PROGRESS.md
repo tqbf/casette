@@ -4,8 +4,8 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**637/637**, 97 suites), `make check`,
-`make build`, and the worker envelope harness (**97/97**) passed for the
+Current gates are green: `swift test` (**638/638**, 97 suites), `make check`,
+`make build`, and the worker envelope harness (**107/107**) passed for the
 latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
 
@@ -20,6 +20,15 @@ rendering tests cover tuple-list basis LaTeX, nested braces, sequential groups,
 and normalized matrices. Details:
 [`problems/027-swiftmath-can-parse-nested-left-right-groups-then-assert.md`](problems/027-swiftmath-can-parse-nested-left-right-groups-then-assert.md).
 Validation: `make check`, `swift test` **637/637**, and `make build` green.
+
+**Latest vector-row crash fix:** Indexing a row out of a matrix (for example
+`random_matrix(QQ, 7)[0]`, or the same through a tape reference) returns a Sage
+vector whose default LaTeX is a flat tuple such as
+`\left(0,\,1,\,2,\,3,\,4,\,5,\,6\right)`. SwiftMath can parse that shape but
+assert while measuring it. Fresh worker envelopes now render standalone vectors
+as one-row array matrices, abbreviated with `\cdots` after the first three
+entries when the vector has more than five entries. Legacy persisted tuple
+LaTeX is marked unsafe in `MathContent` and falls back to plain text.
 
 **Latest help-system work:** Casette now ships a native Help window for the
 Friendly Compiler mini-language. The Help menu has **Friendly Compiler
@@ -82,6 +91,12 @@ renders Sage's returned `(U, S, V)` triple as labeled `U = ...`, `S = ...`, and
 `V = ...` matrices in both plain text and LaTeX. The action vocabulary,
 placeholder rows, worker-protocol docs, worker harness, Swift action tests, and
 real-Sage rendering/sidebar journeys were updated together.
+
+**Matrix display abbreviation:** Matrix LaTeX now abbreviates only when a matrix
+has more than five rows or more than five columns. The display shows the first
+three rows/columns and the final row/column, using `\cdots` for omitted columns
+and `\vdots` for omitted rows, so large transformations stay readable on the
+tape while the underlying Sage value remains unchanged.
 
 **Previous maintenance:** Tape entries are now visibly numbered, and prompts can reuse the last 20 successful reusable tape expressions with `#ROW` syntax. Errors still occupy row numbers but are not valid references; missing/stale references surface as normal compile-preview errors. `#57` expands before friendly compilation to the private Sage dictionary lookup `__casette_tape_refs[57]`, and the worker dictionary is refreshed after successful evals and during Replay Session so restored sessions can rebuild reference state. The private dictionary is filtered out of the Symbols sidebar because it is app plumbing, not user-serviceable state. The app's default approximation precision is now 5 digits (configured at boot over the worker's native 10), and the precision menu includes 2- and 3-digit choices. Tests cover reference expansion, missing references, error-skipping with visible row numbers, the 20-entry window, replay rebuild, symbol filtering, default precision, and existing numeric/queue semantics; `swift test` is green at **302/302**.
 

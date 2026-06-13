@@ -221,6 +221,36 @@ def main():
           all(label in r.get("latex", "") for label in ("U =", "S =", "V =")),
           f"latex={r.get('latex')!r}")
 
+    r = w.eval("matrix(ZZ, 5, 5, range(25))")
+    check("5x5 matrix is still shown in full",
+          "\\cdots" not in r.get("latex", "")
+          and "\\vdots" not in r.get("latex", ""),
+          f"latex={r.get('latex')!r}")
+    r = w.eval("matrix(ZZ, 6, 4, range(24))")
+    check("matrix with more than five rows uses vertical abbreviation",
+          "\\vdots" in r.get("latex", "")
+          and "\\cdots" not in r.get("latex", "")
+          and "20" in r.get("latex", ""),
+          f"latex={r.get('latex')!r}")
+    r = w.eval("matrix(ZZ, 4, 6, range(24))")
+    check("matrix with more than five columns uses horizontal abbreviation",
+          "\\cdots" in r.get("latex", "")
+          and "\\vdots" not in r.get("latex", "")
+          and "23" in r.get("latex", ""),
+          f"latex={r.get('latex')!r}")
+    r = w.eval("matrix(ZZ, 6, 6, range(36))")
+    check("large matrix uses both row and column abbreviation",
+          "\\cdots" in r.get("latex", "")
+          and "\\vdots" in r.get("latex", "")
+          and "35" in r.get("latex", ""),
+          f"latex={r.get('latex')!r}")
+    r = w.eval("matrix(QQ, 7, 7, range(49))[0]")
+    check("matrix row vector uses safe matrix-style LaTeX",
+          "\\begin{array}" in r.get("latex", "")
+          and "\\cdots" in r.get("latex", "")
+          and "\\left(0,\\," not in r.get("latex", ""),
+          f"latex={r.get('latex')!r}")
+
     # -- Unknown-object degradation: classify as unknown, plain==repr-ish,
     #    NEVER an error. (Permutation above already covers it; assert explicitly
     #    that ok is true and it didn't fail.) -----------------------------------

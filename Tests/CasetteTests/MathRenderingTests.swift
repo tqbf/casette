@@ -134,6 +134,15 @@ struct MathContentTests {
         #expect(MathContent.choose(latex: nested) == .plain)
     }
 
+    @Test("legacy flat vector tuple latex falls back before SwiftMath spacing asserts")
+    func legacyFlatVectorTupleFallsBack() {
+        let vector = #"\left(0,\,1,\,2,\,3,\,4,\,5,\,6\right)"#
+        let normalized = SageLatexNormalizer.normalizeForSwiftMath(vector)
+        #expect(SageLatexNormalizer.hasFlatCommaDelimitedLeftRightGroup(normalized))
+        #expect(SageLatexNormalizer.isUnsafeForSwiftMathLayout(normalized))
+        #expect(MathContent.choose(latex: vector) == .plain)
+    }
+
     @Test("sequential delimiter groups still render")
     func sequentialDelimiterGroupsAreSafe() {
         let sequential = #"\left(x + 1\right) + \left(y + 1\right)"#
