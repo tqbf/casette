@@ -9,12 +9,17 @@ compile directly to Sage and it does not own a second source buffer.
 views parse that draft into a small typed shape, let the user edit the shape,
 then render it back to friendly input.
 
-For the current integral prototype:
+The dispatch seam is `FormulaIR` in `FriendlyCompiler`: one case per formula
+family, each wrapping that family's typed IR. The flow for every family:
 
-- `ShellModel.integralFormula` parses `draft` using `IntegralFormulaIR.parse`.
-- `IntegralFormulaBar` edits that `IntegralFormulaIR`.
-- `ShellModel.updateIntegralFormula(_:)` replaces `draft` with
-  `IntegralFormulaIR.friendlyInput`.
+- `ShellModel.formulaIR` parses `draft` using `FormulaIR.parse` (which tries
+  each family's IR; families are keyed by disjoint leading commands).
+- The family's bar view (dispatched by `FormulaBarView`) edits the typed IR.
+- `ShellModel.updateFormula(_:)` replaces `draft` with the IR's
+  `friendlyInput`.
+
+The integral prototype is the reference implementation of the pattern
+(`IntegralFormulaIR` / `IntegralFormulaBar`).
 
 Because the draft remains the source of truth, all existing input behavior
 continues to work: live preview, Return submission, history, ambiguity, compile
@@ -94,15 +99,44 @@ integrate(__casette_tape_refs[14] + x^2, (x, 0, 1))
 
 The row still records the user-facing raw input with `#14`.
 
+## Partial Edits Must Round-Trip
+
+The bars' token bindings re-read the IR from a fresh re-parse of the draft on
+every access. So every INTERMEDIATE editing state must be a parse/render fixed
+point, or a half-typed field silently vanishes when focus moves (the original
+integral bar lost a typed lower bound this way: `x=0..` failed the strict
+range parse and re-read as empty).
+
+Rule: IR parsing is TOLERANT — use `FriendlyCompiler.parsePartialRange` (not
+the strict `parseRange`) and keep half-typed clauses' text. The compiler
+lowerings stay strict; an incomplete range remains an honest compile error in
+the preview line. `PartialEditInvarianceTests` simulates each bar's per-field
+edit sequence and asserts nothing typed is ever lost — add a case there for
+every new family.
+
+## Keyboard
+
+Tab in the main editor enters the lane (first token field) when a formula is
+showing and no ambiguity picker is pending; Tab/Shift-Tab then walk the tokens
+through the native key-view loop. Return submits from the main editor only.
+
 ## Extension Rule
 
 To add another completion UI:
 
-1. Add a small typed IR in `FriendlyCompiler`.
-2. Parse the relevant friendly command from `ShellModel.draft`.
+1. Add a small typed IR in `FriendlyCompiler`, plus a `FormulaIR` case and
+   parse hook.
+2. Parse the relevant friendly command from `ShellModel.draft` (tolerantly —
+   see Partial Edits above).
 3. Render edits back to friendly input.
 4. Let `CompiledInput` remain the only app compile boundary.
 5. Keep the visual hint lane readable without hiding optional arguments behind
-   horizontal scrolling at the normal window size.
+   horizontal scrolling at the normal window size. Reuse `FormulaFunctionChip`
+   and `FormulaTokenField`; tokens that carry whole equations or binding lists
+   should pass `growsWithContent: true` (the lane's `.fixedSize` layout sizes
+   fields to their IDEAL width, so a fixed compact ideal clips long payloads
+   regardless of `maxWidth`).
+6. Add the family to `PartialEditInvarianceTests` and the round-trip/`#ROW`
+   preservation tests.
 
 Do not have completion UI emit Sage directly.

@@ -22,21 +22,42 @@ the argument lane, and the formula expansion now sits on its own full-width
 lane below the input controls so the optional bounds are visible without
 horizontal scrolling at the normal window size.
 
-**Completion UI Batch B:** Formula bars now also cover `derivative`, `limit`,
-`taylor`, `sum`, and `product`. New keyword lowerings `sum`/`product` mirror the
-definite-integral branch (`sum k^2, k=1..n` → `sum(k^2, k, 1, n)`, lowercase
-symbolic Sage). The `derivative` lowering gained an optional trailing `, N`
-order (comma form only; `derivative sin(x), 2` → `derivative(sin(x), x, 2)`)
-and `limit` gained an optional `left`/`right` third clause
-(`dir='-'`/`dir='+'`); both extensions are byte-identical to before when the new
-clause is absent, so the frozen V0.7 contract is untouched. Four new IRs
-(`DerivativeFormulaIR`, `LimitFormulaIR`, `TaylorFormulaIR`, and the
-sum/product `SeriesRangeFormulaIR`) parse/round-trip back to friendly input and
-preserve `#ROW` references; `FormulaIR` dispatch, `ShellModel` accessors, the
-four bar views (the limit bar uses a `.menu` Picker for the direction), and
-`FormulaBarView` are wired up. Bounds remain one semantic chip group. New
-lowering/IR/round-trip/`#ROW` tests plus model-rewrite tests for sum and limit;
-`make check` and `make test` green at **366/366**.
+**Completion UI hitlist (2026-06-12, branch `fable/completion-hitlist`):** The
+integral formula bar's architecture now covers **36 completions** across six
+batches, all dispatched through one new seam: `FormulaIR` (FriendlyCompiler)
+wraps each family's typed IR, `ShellModel.formulaIR`/`updateFormula` is the
+single draft funnel, and `FormulaBarView` switches the hint lane. Every bar
+follows the COMPLETION-UI.md Extension Rule — parse the draft, edit a typed
+IR, render BACK to friendly input (never Sage), `#ROW` references preserved
+verbatim until `CompiledInput`, optional args grouped as one semantic chip.
+Implemented (trigger words): expand, factor, simplify, solve · derivative
+(+optional order clause), limit (+optional left/right direction), taylor, sum,
+product (new lowerings) · plot, parametric_plot, implicit_plot (new lowerings;
+equation sugar `=`→`==`, bare expr → `== 0`) · matrix, vector, det/determinant,
+inverse, transpose, rank, rref, eigenvalues, eigenvectors (matrix methods now
+accept variables/expressions/tape refs: `det A` → `(A).det()`) · gradient,
+jacobian, hessian, subs, numeric/approx/decimal, latex · var, assume, forget
+(lowering only — a no-argument command needs no lane), choose, gcd, lcm,
+factorial, is_prime, factor_integer/prime_factorization, mean (owned exact
+lowering `sum(D)/len(D)`; Sage's global mean() is removed upstream).
+**Deliberately deferred:** stddev (no stable Sage backend; an owned
+sample-stddev expression repeats the payload three times — unreadable as
+user-visible Generated Sage), the hitlist's solve `==0` normalization and plot
+default range (each would flip a frozen V0.7 contract test: `solveWithoutEquals`,
+`plotNoRange`), and the infix `n choose k` spelling (the shim only matches
+leading command words). **Live-verified on screen** (computer-use, isolated
+`CASETTE_CONFIG_DIR`): all 30 checked lanes match the integral bar's look/feel;
+11 submitted results correct (sum k^2 1..10 → 385, det → −2, subs → 13, choose
+→ 120, factor #1 + 2 → 2·3, …). The verification round also caught and fixed:
+(1) partial range edits losing data — the IRs now re-parse through a tolerant
+`parsePartialRange` (compiler lowerings stay strict) with a
+`PartialEditInvarianceTests` net asserting no per-field edit sequence ever
+drops typed text; (2) no keyboard path into the lane — Tab in the editor now
+enters the token fields via the key-view loop when a lane is showing
+(`.ignored` otherwise; Return still submits only from the editor); (3) long
+equation payloads render-clipping at the fixed token ideal width — eq/eqn/
+bindings/condition tokens now grow with content (capped 220pt). `make check` /
+`make test` **608/608** / `make build` green.
 
 **Previous maintenance:** Restored tape rows now read as **not live** until Replay Session recomputes them into the current Sage namespace. The tape still restores render-ready from disk, but cached rows are visually deemphasized and row-derived execution affordances (History rerun, plot regenerate, Approximate Numerically, and Actions-tab command buttons) are disabled/guarded so users do not fire commands against variables that are only present in the old persisted transcript. Replayed rows become live again and regain the normal affordances. A focused persistence test covers the stale-row guard; `make check`, `make test` (**298/298**), and `make build` are green.
 
