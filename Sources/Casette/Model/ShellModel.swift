@@ -573,6 +573,11 @@ final class ShellModel {
         return ir
     }
 
+    var statsFormula: StatsFormulaIR? {
+        guard case let .stats(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }

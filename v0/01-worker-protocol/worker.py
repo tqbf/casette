@@ -148,6 +148,208 @@ from sage.repl.preparse import preparse  # noqa: E402
 NS = {}
 exec("from sage.all import *", NS)
 
+
+# ---------------------------------------------------------------------------
+# Casette preload helpers.
+# ---------------------------------------------------------------------------
+#
+# These are humane calculator APIs layered over Sage/Python's rougher names.
+# They are installed BEFORE the symbol-table baseline so they behave like
+# built-ins: raw users can call them, friendly compiler lowerings can target
+# them, and untouched helpers do not clutter the Symbols sidebar.
+
+def _casette_require_positive(name, value):
+    if value <= 0:
+        raise ValueError("%s must be positive" % name)
+
+
+def _casette_require_probability(name, value):
+    if value < 0 or value > 1:
+        raise ValueError("%s must be between 0 and 1" % name)
+
+
+def _casette_int(name, value):
+    ivalue = int(value)
+    if value != ivalue:
+        raise ValueError("%s must be an integer" % name)
+    return ivalue
+
+
+try:
+    from scipy.stats import norm as _casette_scipy_norm  # noqa: E402
+except Exception:  # noqa: BLE001 - helper calls raise clearly if fallback fails
+    _casette_scipy_norm = None
+
+
+def normal_pdf(x, mean=0, sd=1):
+    _casette_require_positive("sd", sd)
+    if _casette_scipy_norm is not None:
+        return _casette_scipy_norm.pdf(x, loc=mean, scale=sd)
+    z = (x - mean) / sd
+    return exp(-z**2 / 2) / (sd * sqrt(2 * pi))  # noqa: F405
+
+
+def normal_cdf(x, mean=0, sd=1):
+    _casette_require_positive("sd", sd)
+    if _casette_scipy_norm is not None:
+        return _casette_scipy_norm.cdf(x, loc=mean, scale=sd)
+    d = RealDistribution("gaussian", sd)  # noqa: F405
+    return d.cum_distribution_function(x - mean)
+
+
+def normal_between(a, b, mean=0, sd=1):
+    return normal_cdf(b, mean=mean, sd=sd) - normal_cdf(a, mean=mean, sd=sd)
+
+
+def normal_inv(p, mean=0, sd=1):
+    _casette_require_probability("p", p)
+    _casette_require_positive("sd", sd)
+    if _casette_scipy_norm is not None:
+        return _casette_scipy_norm.ppf(p, loc=mean, scale=sd)
+    d = RealDistribution("gaussian", sd)  # noqa: F405
+    return mean + d.cum_distribution_function_inv(p)
+
+
+def binomial_pmf(k, n, p):
+    k = _casette_int("k", k)
+    n = _casette_int("n", n)
+    _casette_require_probability("p", p)
+    if n < 0:
+        raise ValueError("n must be nonnegative")
+    if k < 0 or k > n:
+        return 0
+    return binomial(n, k) * p**k * (1 - p)**(n - k)  # noqa: F405
+
+
+def binomial_between(a, b, n, p):
+    a = _casette_int("a", a)
+    b = _casette_int("b", b)
+    if b < a:
+        return 0
+    return sum(binomial_pmf(i, n=n, p=p) for i in range(a, b + 1))
+
+
+def binomial_at_most(k, n, p):
+    k = _casette_int("k", k)
+    return binomial_between(0, k, n=n, p=p)
+
+
+def binomial_cdf(k, n, p):
+    return binomial_at_most(k, n=n, p=p)
+
+
+def binomial_at_least(k, n, p):
+    k = _casette_int("k", k)
+    n = _casette_int("n", n)
+    return binomial_between(k, n, n=n, p=p)
+
+
+def poisson_pmf(k, lambda_):
+    k = _casette_int("k", k)
+    _casette_require_positive("lambda", lambda_)
+    if k < 0:
+        return 0
+    return exp(-lambda_) * lambda_**k / factorial(k)  # noqa: F405
+
+
+def poisson_between(a, b, lambda_):
+    a = _casette_int("a", a)
+    b = _casette_int("b", b)
+    if b < a:
+        return 0
+    return sum(poisson_pmf(i, lambda_=lambda_) for i in range(a, b + 1))
+
+
+def poisson_at_most(k, lambda_):
+    k = _casette_int("k", k)
+    return poisson_between(0, k, lambda_=lambda_)
+
+
+def poisson_cdf(k, lambda_):
+    return poisson_at_most(k, lambda_=lambda_)
+
+
+def poisson_at_least(k, lambda_):
+    k = _casette_int("k", k)
+    return 1 - poisson_at_most(k - 1, lambda_=lambda_)
+
+
+def exponential_pdf(x, rate):
+    _casette_require_positive("rate", rate)
+    if x < 0:
+        return 0
+    return rate * exp(-rate * x)  # noqa: F405
+
+
+def exponential_cdf(x, rate):
+    _casette_require_positive("rate", rate)
+    if x < 0:
+        return 0
+    return 1 - exp(-rate * x)  # noqa: F405
+
+
+def exponential_between(a, b, rate):
+    if b < a:
+        return 0
+    return exponential_cdf(b, rate=rate) - exponential_cdf(a, rate=rate)
+
+
+def exponential_inv(p, rate):
+    _casette_require_probability("p", p)
+    _casette_require_positive("rate", rate)
+    return -log(1 - p) / rate  # noqa: F405
+
+
+def uniform_pdf(x, low, high):
+    if high <= low:
+        raise ValueError("high must be greater than low")
+    if x < low or x > high:
+        return 0
+    return 1 / (high - low)
+
+
+def uniform_cdf(x, low, high):
+    if high <= low:
+        raise ValueError("high must be greater than low")
+    if x <= low:
+        return 0
+    if x >= high:
+        return 1
+    return (x - low) / (high - low)
+
+
+def uniform_between(a, b, low, high):
+    if b < a:
+        return 0
+    return uniform_cdf(b, low=low, high=high) - uniform_cdf(a, low=low, high=high)
+
+
+def uniform_inv(p, low, high):
+    _casette_require_probability("p", p)
+    if high <= low:
+        raise ValueError("high must be greater than low")
+    return low + p * (high - low)
+
+
+def _install_casette_preloads(ns):
+    names = [
+        "normal_pdf", "normal_cdf", "normal_between", "normal_inv",
+        "binomial_pmf", "binomial_cdf", "binomial_between",
+        "binomial_at_most", "binomial_at_least",
+        "poisson_pmf", "poisson_cdf", "poisson_between",
+        "poisson_at_most", "poisson_at_least",
+        "exponential_pdf", "exponential_cdf", "exponential_between",
+        "exponential_inv",
+        "uniform_pdf", "uniform_cdf", "uniform_between", "uniform_inv",
+    ]
+    for name in names:
+        ns[name] = globals()[name]
+    ns["TAU"] = 2 * pi  # noqa: F405
+    ns["PHI"] = (1 + sqrt(5)) / 2  # noqa: F405
+
+
+_install_casette_preloads(NS)
+
 # V0.6 — Live symbol-table baseline.
 # ----------------------------------
 # The `symbols` op shows only USER-created bindings, so we must know what the

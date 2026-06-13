@@ -575,6 +575,27 @@ struct ShellModelInputTests {
         #expect(model.draftPreview == .generated("binomial(10, 3)"))
     }
 
+    @Test("stats formula bar model rewrites friendly IR with named parameters")
+    func statsFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "binomial_cdf 3"
+        guard case let .stats(formula0) = model.formulaIR, formula0.kind == .binomialCDF else {
+            Issue.record("expected stats(binomial_cdf) formula")
+            return
+        }
+        #expect(formula0.positional == ["3"])
+        #expect(formula0.named.isEmpty)
+
+        var formula = formula0
+        formula.named["n"] = "10"
+        formula.named["p"] = ".5"
+        model.updateFormula(.stats(formula))
+        #expect(model.draft == "binomial_cdf 3, n=10, p=.5")
+        #expect(model.statsFormula?.named["n"] == "10")
+        #expect(model.statsFormula?.named["p"] == ".5")
+        #expect(model.draftPreview == .generated("binomial_cdf(3, n=10, p=.5)"))
+    }
+
     @Test("assume formula bar model rewrites a condition edit")
     func assumeFormulaModelRewrite() {
         let model = ShellModel()

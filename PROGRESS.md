@@ -4,10 +4,22 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**611/611**, 93 suites), `make check`,
+Current gates are green: `swift test` (**630/630**, 95 suites), `make check`,
 `make build`, and the worker envelope harness (**97/97**) passed for the
-latest result-action work. Detailed historical notes live in [`progress/`](progress/),
+latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest statistics work:** [plans/STAT.md](plans/STAT.md)'s first and second
+batches are implemented, backed by [plans/PRELOAD.md](plans/PRELOAD.md)'s
+hidden worker preloads. The canonical worker now installs normal, binomial,
+Poisson, exponential, and uniform helper functions before the symbol-table
+baseline, so raw Sage can call `normal_between(-1, 1)` and
+`binomial_cdf(3, n=10, p=.5)` without those helpers appearing in Symbols.
+Friendly compiler Batch G adds 22 distribution commands with compact formula
+bars and readable generated Sage; `lambda=` lowers to Python-safe `lambda_=`,
+and `min=`/`max=` lower to `low=`/`high=`. Validation: `swift test`
+**630/630**, `make check`, `make build`, and the worker envelope harness
+**97/97**.
 
 **Latest layout work:** The main tape/input boundary and the sidebar's
 top/content boundary are now resizable with app-owned persisted dimensions
@@ -91,6 +103,7 @@ bindings/condition tokens now grow with content (capped 220pt). `make check` /
 
 | # | Entry | Status | Summary |
 | ---: | --- | --- | --- |
+| 0 | [Statistics + preload implementation](progress/000-2026-06-13-stat-preload-planning.md) | PASS | Hidden worker preload helpers plus normal/binomial/Poisson/exponential/uniform friendly commands and formula bars. |
 | 1 | [V1.10: Sage Doctor in app](progress/001-2026-06-12-v1-10-sage-doctor-in-app-pass.md) | PASS | In-app Sage Doctor sheet, diagnostic checks, setup-failure recovery. |
 | 2 | [V1.9: Session persistence and recovery](progress/002-2026-06-12-v1-9-session-persistence-and-recovery-pass.md) | PASS | Persistent session tape: restore, replay, crash recovery, layout memory. |
 | 3 | [V1.8: Exact/numeric controls](progress/003-2026-06-12-v1-8-exact-numeric-controls-pass-live.md) | PASS | Exact/numeric display controls, precision menu, numeric replay semantics. |

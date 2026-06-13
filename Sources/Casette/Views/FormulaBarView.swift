@@ -45,6 +45,8 @@ struct FormulaBarView: View {
             AssumeFormulaBar(model: model, formula: ir)
         case let .binary(ir):
             BinaryFormulaBar(model: model, formula: ir)
+        case let .stats(ir):
+            StatsFormulaBar(model: model, formula: ir)
         }
     }
 }

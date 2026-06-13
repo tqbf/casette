@@ -117,6 +117,41 @@ struct SageKernelIntegrationTests {
         await controller.shutdown()
     }
 
+    @Test("Casette preloads are callable built-ins and hidden from symbols", .timeLimit(.minutes(5)))
+    func casettePreloadsAreHiddenBuiltIns() async {
+        let controller = SessionController(transportFactory: SageTestEnvironment.factory)
+        await controller.connect()
+
+        let normal = await controller.evaluate("normal_cdf(0)")
+        #expect(normal.status == .ok)
+        #expect(normal.result?.plain == "0.5")
+
+        let binomial = await controller.evaluate("binomial_pmf(3, n=10, p=1/2)")
+        #expect(binomial.status == .ok)
+        #expect(binomial.result?.plain == "15/128")
+
+        let poisson = await controller.evaluate("poisson_cdf(2, lambda_=3)")
+        #expect(poisson.status == .ok)
+        #expect(poisson.result?.approx == "0.4231900811")
+
+        let untouchedSymbols = await controller.fetchSymbols()
+        #expect(untouchedSymbols?.entries.contains { $0.name == "normal_cdf" } == false)
+        #expect(untouchedSymbols?.entries.contains { $0.name == "binomial_pmf" } == false)
+
+        _ = await controller.evaluate("normal_cdf = 42")
+        let reassignedSymbols = await controller.fetchSymbols()
+        #expect(reassignedSymbols?.entries.contains { $0.name == "normal_cdf" && $0.kind == "integer" } == true)
+
+        await controller.restart()
+        let afterRestart = await controller.evaluate("normal_cdf(0)")
+        #expect(afterRestart.status == .ok)
+        #expect(afterRestart.result?.plain == "0.5")
+        let freshSymbols = await controller.fetchSymbols()
+        #expect(freshSymbols?.entries.contains { $0.name == "normal_cdf" } == false)
+
+        await controller.shutdown()
+    }
+
     @Test("escalation: a SIGINT-ignoring runaway is hard-killed; restart recovers", .timeLimit(.minutes(5)))
     func escalationHardKillsRealRunaway() async {
         var configuration = SessionController.Configuration()
