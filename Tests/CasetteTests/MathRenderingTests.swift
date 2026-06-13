@@ -120,10 +120,35 @@ struct MathContentTests {
     @Test("legacy basis-vector tuple lists fall back before SwiftMath layout")
     func legacyBasisVectorTupleListFallsBack() {
         let basis = #"\left[\left(1,\,-2,\,1\right)\right]"#
-        #expect(SageLatexNormalizer.isUnsafeForSwiftMathLayout(
-            SageLatexNormalizer.normalizeForSwiftMath(basis)
-        ))
+        let normalized = SageLatexNormalizer.normalizeForSwiftMath(basis)
+        #expect(SageLatexNormalizer.hasNestedLeftRightGroup(normalized))
+        #expect(SageLatexNormalizer.isUnsafeForSwiftMathLayout(normalized))
         #expect(MathContent.choose(latex: basis) == .plain)
+    }
+
+    @Test("nested delimiter groups fall back before SwiftMath spacing asserts")
+    func nestedDelimiterGroupsFallBack() {
+        let nested = #"\left\{\left(x + 1\right),\,2\right\}"#
+        let normalized = SageLatexNormalizer.normalizeForSwiftMath(nested)
+        #expect(SageLatexNormalizer.hasNestedLeftRightGroup(normalized))
+        #expect(MathContent.choose(latex: nested) == .plain)
+    }
+
+    @Test("sequential delimiter groups still render")
+    func sequentialDelimiterGroupsAreSafe() {
+        let sequential = #"\left(x + 1\right) + \left(y + 1\right)"#
+        let normalized = SageLatexNormalizer.normalizeForSwiftMath(sequential)
+        #expect(!SageLatexNormalizer.hasNestedLeftRightGroup(normalized))
+        #expect(MathContent.choose(latex: sequential) == .math(latex: sequential))
+    }
+
+    @Test("normalized matrices are not treated as nested delimiter groups")
+    func normalizedMatricesAreSafe() {
+        let matrix = "\\left(\\begin{array}{rr}1 & 2 \\\\ 3 & 4\\end{array}\\right)"
+        let normalized = SageLatexNormalizer.normalizeForSwiftMath(matrix)
+        #expect(normalized == "\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}")
+        #expect(!SageLatexNormalizer.hasNestedLeftRightGroup(normalized))
+        #expect(MathContent.choose(latex: matrix) == .math(latex: matrix))
     }
 
     @Test("worker basis-vector LaTeX renders as math")

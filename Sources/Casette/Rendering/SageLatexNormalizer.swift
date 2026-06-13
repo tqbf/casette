@@ -22,15 +22,39 @@ enum SageLatexNormalizer {
         return rewriteSageArrayMatrices(unwrapped)
     }
 
-    /// SwiftMath can parse Sage's tuple-list basis LaTeX, but measured on
-    /// macOS it can assert while laying out nested `\left[ \left( ... \right) ]`
-    /// groups such as `right_kernel().basis()`. Treat that family as unsupported
-    /// so result cards fall back to the worker's plain text instead of crashing.
+    /// SwiftMath can parse some nested `\left...\right` delimiter groups, but
+    /// measured on macOS it can assert while laying them out. Treat that family
+    /// as unsupported so result cards fall back to the worker's plain text
+    /// instead of crashing.
     static func isUnsafeForSwiftMathLayout(_ normalizedLatex: String) -> Bool {
-        normalizedLatex.range(
-            of: #"\\left\[\s*\\left\("#,
-            options: .regularExpression
-        ) != nil
+        hasNestedLeftRightGroup(normalizedLatex)
+    }
+
+    /// Detect a `\left` before its containing `\right` has closed. Sequential
+    /// groups are fine; nesting is the shape that trips SwiftMath's spacing
+    /// assertion during `MTMathUILabel.fittingSize`.
+    static func hasNestedLeftRightGroup(_ latex: String) -> Bool {
+        var searchStart = latex.startIndex
+        var depth = 0
+
+        while searchStart < latex.endIndex {
+            guard let next = latex[searchStart...].range(
+                of: #"\\(?:left|right)"#,
+                options: .regularExpression
+            ) else { return false }
+
+            let token = String(latex[next])
+            if token == "\\left" {
+                if depth > 0 { return true }
+                depth += 1
+            } else if depth > 0 {
+                depth -= 1
+            }
+
+            searchStart = next.upperBound
+        }
+
+        return false
     }
 
     private static func collapseWhitespace(_ latex: String) -> String {

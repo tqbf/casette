@@ -5,6 +5,7 @@ Each linked file preserves the original lesson text; entries are ordered newest 
 
 | # | Problem | Intersects |
 | ---: | --- | --- |
+| 27 | [SwiftMath can parse nested `\left...\right` groups, then assert during layout](problems/027-swiftmath-can-parse-nested-left-right-groups-then-assert.md) | SwiftMath layout assertions, LaTeX preflight, plain-text fallback. |
 | 1 | [Restoring a session: refusing a newer schema must also disable SAVING, "restored" is not a persisted fact, and a restored `running` row must not spin](problems/001-restoring-a-session-refusing-a-newer-schema-must-also.md) | Persistence schema refusals, transient restore UI state, stale in-flight rows. |
 | 2 | [Restart re-init must CHAIN on the serial kernel queue — only the kill/boot itself may run un-chained, or the next submission races the fresh worker's preludes](problems/002-restart-re-init-must-chain-on-the-serial-kernel.md) | Restart ordering, queued worker re-init, post-restart state races. |
 | 3 | [AttributeGraph spin: an NSView write that self-invalidates DURING a SwiftUI graph update = an infinite update loop — 100% CPU, frozen app, no crash](problems/003-attributegraph-spin-an-nsview-write-that-self-invalidates-during.md) | SwiftUI/AppKit layout invalidation loops, NSViewRepresentable measurement, plot sizing. |
