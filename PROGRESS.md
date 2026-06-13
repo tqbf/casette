@@ -4,10 +4,19 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**630/630**, 95 suites), `make check`,
+Current gates are green: `swift test` (**634/634**, 97 suites), `make check`,
 `make build`, and the worker envelope harness (**97/97**) passed for the
 latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest help-system work:** Casette now ships a native Help window for the
+Friendly Compiler mini-language. The Help menu has **Friendly Compiler
+Language**, opening a separate searchable reference window that covers the
+current command families and shows generated Sage for each example. The content
+is code-native (`HelpReference`) so it packages reliably with the SwiftPM app
+bundle, and `HelpReferenceTests` guard representative command coverage plus the
+key boundary rules. Validation: `make check`, `swift test` **634/634**, and
+`make build` green. Details: [`plans/HELP-SYSTEM.md`](plans/HELP-SYSTEM.md).
 
 **Latest bug fix:** Sage help output no longer makes the app appear hung.
 `help(x)` for a symbolic expression can emit hundreds of KB of pydoc text; the

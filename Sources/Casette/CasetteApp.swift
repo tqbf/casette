@@ -14,6 +14,12 @@ struct CasetteApp: App {
         .commands {
             SidebarToggleCommands()
             SageCommands()
+            HelpCommands()
         }
+
+        Window("Friendly Compiler Language", id: HelpWindow.id) {
+            HelpView()
+        }
+        .defaultSize(width: 820, height: 620)
     }
 }

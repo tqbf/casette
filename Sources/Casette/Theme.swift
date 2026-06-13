@@ -178,5 +178,17 @@ enum Theme {
         static let formulaTokenValue = Font.callout.monospaced()
         /// Formula punctuation between tokens.
         static let formulaPunctuation = Font.callout.weight(.semibold).monospaced()
+        /// Help window title.
+        static let helpTitle = Font.title2.weight(.semibold)
+        /// Help section headings.
+        static let helpSectionTitle = Font.title3.weight(.semibold)
+        /// Help explanatory prose.
+        static let helpBody = Font.callout
+        /// Help table labels.
+        static let helpColumnLabel = Font.caption.weight(.semibold)
+        /// Friendly input examples.
+        static let helpCommand = Font.callout.weight(.medium).monospaced()
+        /// Generated Sage examples.
+        static let helpSage = Font.caption.monospaced()
     }
 }
