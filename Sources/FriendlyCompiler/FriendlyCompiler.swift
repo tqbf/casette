@@ -120,6 +120,28 @@ public enum FriendlyCompiler {
         case .isPrime:      return wrapCall("is_prime", rest)
         case .factorInteger: return wrapCall("factor", rest)
         case .mean:         return meanForm(rest)
+        case .normalPDF:    return statsForm(rest, kind: .normalPDF)
+        case .normalCDF:    return statsForm(rest, kind: .normalCDF)
+        case .normalBetween: return statsForm(rest, kind: .normalBetween)
+        case .normalInv:    return statsForm(rest, kind: .normalInv)
+        case .binomialPMF:  return statsForm(rest, kind: .binomialPMF)
+        case .binomialCDF:  return statsForm(rest, kind: .binomialCDF)
+        case .binomialBetween: return statsForm(rest, kind: .binomialBetween)
+        case .binomialAtMost: return statsForm(rest, kind: .binomialAtMost)
+        case .binomialAtLeast: return statsForm(rest, kind: .binomialAtLeast)
+        case .poissonPMF:   return statsForm(rest, kind: .poissonPMF)
+        case .poissonCDF:   return statsForm(rest, kind: .poissonCDF)
+        case .poissonBetween: return statsForm(rest, kind: .poissonBetween)
+        case .poissonAtMost: return statsForm(rest, kind: .poissonAtMost)
+        case .poissonAtLeast: return statsForm(rest, kind: .poissonAtLeast)
+        case .exponentialPDF: return statsForm(rest, kind: .exponentialPDF)
+        case .exponentialCDF: return statsForm(rest, kind: .exponentialCDF)
+        case .exponentialBetween: return statsForm(rest, kind: .exponentialBetween)
+        case .exponentialInv: return statsForm(rest, kind: .exponentialInv)
+        case .uniformPDF:   return statsForm(rest, kind: .uniformPDF)
+        case .uniformCDF:   return statsForm(rest, kind: .uniformCDF)
+        case .uniformBetween: return statsForm(rest, kind: .uniformBetween)
+        case .uniformInv:   return statsForm(rest, kind: .uniformInv)
         }
     }
 
@@ -135,6 +157,11 @@ public enum FriendlyCompiler {
         case gradient, hessian, jacobian, subs, numeric, latex
         case varDeclaration, assume, forget, choose, gcd, lcm
         case factorial, isPrime, factorInteger, mean
+        case normalPDF, normalCDF, normalBetween, normalInv
+        case binomialPMF, binomialCDF, binomialBetween, binomialAtMost, binomialAtLeast
+        case poissonPMF, poissonCDF, poissonBetween, poissonAtMost, poissonAtLeast
+        case exponentialPDF, exponentialCDF, exponentialBetween, exponentialInv
+        case uniformPDF, uniformCDF, uniformBetween, uniformInv
 
         /// The phrase(s) that introduce this command. Multi-word first so the
         /// matcher prefers "double integral" over "integral".
@@ -179,6 +206,28 @@ public enum FriendlyCompiler {
             case .isPrime: return ["is_prime"]
             case .factorInteger: return ["factor_integer", "prime_factorization"]
             case .mean: return ["mean"]
+            case .normalPDF: return ["normal_pdf"]
+            case .normalCDF: return ["normal_cdf"]
+            case .normalBetween: return ["normal_between"]
+            case .normalInv: return ["normal_inv"]
+            case .binomialPMF: return ["binomial_pmf"]
+            case .binomialCDF: return ["binomial_cdf"]
+            case .binomialBetween: return ["binomial_between"]
+            case .binomialAtMost: return ["binomial_at_most"]
+            case .binomialAtLeast: return ["binomial_at_least"]
+            case .poissonPMF: return ["poisson_pmf"]
+            case .poissonCDF: return ["poisson_cdf"]
+            case .poissonBetween: return ["poisson_between"]
+            case .poissonAtMost: return ["poisson_at_most"]
+            case .poissonAtLeast: return ["poisson_at_least"]
+            case .exponentialPDF: return ["exponential_pdf"]
+            case .exponentialCDF: return ["exponential_cdf"]
+            case .exponentialBetween: return ["exponential_between"]
+            case .exponentialInv: return ["exponential_inv"]
+            case .uniformPDF: return ["uniform_pdf"]
+            case .uniformCDF: return ["uniform_cdf"]
+            case .uniformBetween: return ["uniform_between"]
+            case .uniformInv: return ["uniform_inv"]
             }
         }
 
@@ -225,6 +274,28 @@ public enum FriendlyCompiler {
             case .isPrime: return "Try: is_prime 104729"
             case .factorInteger: return "Try: factor_integer 3600"
             case .mean: return "Try: mean [1, 2, 3]"
+            case .normalPDF: return "Try: normal_pdf 0, mean=0, sd=1"
+            case .normalCDF: return "Try: normal_cdf 1.96"
+            case .normalBetween: return "Try: normal_between -1, 1"
+            case .normalInv: return "Try: normal_inv .975"
+            case .binomialPMF: return "Try: binomial_pmf 3, n=10, p=.5"
+            case .binomialCDF: return "Try: binomial_cdf 3, n=10, p=.5"
+            case .binomialBetween: return "Try: binomial_between 3, 7, n=10, p=.5"
+            case .binomialAtMost: return "Try: binomial_at_most 3, n=10, p=.5"
+            case .binomialAtLeast: return "Try: binomial_at_least 8, n=10, p=.5"
+            case .poissonPMF: return "Try: poisson_pmf 2, lambda=3"
+            case .poissonCDF: return "Try: poisson_cdf 2, lambda=3"
+            case .poissonBetween: return "Try: poisson_between 1, 4, lambda=3"
+            case .poissonAtMost: return "Try: poisson_at_most 2, lambda=3"
+            case .poissonAtLeast: return "Try: poisson_at_least 5, lambda=3"
+            case .exponentialPDF: return "Try: exponential_pdf 1, rate=2"
+            case .exponentialCDF: return "Try: exponential_cdf 1, rate=2"
+            case .exponentialBetween: return "Try: exponential_between 1, 2, rate=2"
+            case .exponentialInv: return "Try: exponential_inv .95, rate=2"
+            case .uniformPDF: return "Try: uniform_pdf .5, min=0, max=1"
+            case .uniformCDF: return "Try: uniform_cdf .5, min=0, max=1"
+            case .uniformBetween: return "Try: uniform_between .2, .8, min=0, max=1"
+            case .uniformInv: return "Try: uniform_inv .95, min=0, max=1"
             }
         }
     }
@@ -1210,6 +1281,208 @@ public enum FriendlyCompiler {
         return .success(
             generatedSage: "sum(\(data))/len(\(data))",
             requiredVariables: Variables.freeVariables(in: data))
+    }
+
+    // MARK: - Form: statistics distributions
+
+    enum StatsKind: Equatable {
+        case normalPDF, normalCDF, normalBetween, normalInv
+        case binomialPMF, binomialCDF, binomialBetween, binomialAtMost, binomialAtLeast
+        case poissonPMF, poissonCDF, poissonBetween, poissonAtMost, poissonAtLeast
+        case exponentialPDF, exponentialCDF, exponentialBetween, exponentialInv
+        case uniformPDF, uniformCDF, uniformBetween, uniformInv
+
+        var command: String {
+            switch self {
+            case .normalPDF: return "normal_pdf"
+            case .normalCDF: return "normal_cdf"
+            case .normalBetween: return "normal_between"
+            case .normalInv: return "normal_inv"
+            case .binomialPMF: return "binomial_pmf"
+            case .binomialCDF: return "binomial_cdf"
+            case .binomialBetween: return "binomial_between"
+            case .binomialAtMost: return "binomial_at_most"
+            case .binomialAtLeast: return "binomial_at_least"
+            case .poissonPMF: return "poisson_pmf"
+            case .poissonCDF: return "poisson_cdf"
+            case .poissonBetween: return "poisson_between"
+            case .poissonAtMost: return "poisson_at_most"
+            case .poissonAtLeast: return "poisson_at_least"
+            case .exponentialPDF: return "exponential_pdf"
+            case .exponentialCDF: return "exponential_cdf"
+            case .exponentialBetween: return "exponential_between"
+            case .exponentialInv: return "exponential_inv"
+            case .uniformPDF: return "uniform_pdf"
+            case .uniformCDF: return "uniform_cdf"
+            case .uniformBetween: return "uniform_between"
+            case .uniformInv: return "uniform_inv"
+            }
+        }
+
+        var positionalCount: Int {
+            switch self {
+            case .normalBetween, .binomialBetween, .poissonBetween,
+                 .exponentialBetween, .uniformBetween:
+                return 2
+            default:
+                return 1
+            }
+        }
+
+        var allowedNamed: [String] {
+            switch self {
+            case .normalPDF, .normalCDF, .normalBetween, .normalInv:
+                return ["mean", "sd"]
+            case .binomialPMF, .binomialCDF, .binomialBetween,
+                 .binomialAtMost, .binomialAtLeast:
+                return ["n", "p"]
+            case .poissonPMF, .poissonCDF, .poissonBetween,
+                 .poissonAtMost, .poissonAtLeast:
+                return ["lambda"]
+            case .exponentialPDF, .exponentialCDF, .exponentialBetween, .exponentialInv:
+                return ["rate"]
+            case .uniformPDF, .uniformCDF, .uniformBetween, .uniformInv:
+                return ["min", "max"]
+            }
+        }
+
+        var requiredNamed: [String] {
+            switch self {
+            case .normalPDF, .normalCDF, .normalBetween, .normalInv:
+                return []
+            default:
+                return allowedNamed
+            }
+        }
+
+        var example: String {
+            switch self {
+            case .normalPDF: return "Try: normal_pdf 0, mean=0, sd=1"
+            case .normalCDF: return "Try: normal_cdf 1.96"
+            case .normalBetween: return "Try: normal_between -1, 1"
+            case .normalInv: return "Try: normal_inv .975"
+            case .binomialPMF: return "Try: binomial_pmf 3, n=10, p=.5"
+            case .binomialCDF: return "Try: binomial_cdf 3, n=10, p=.5"
+            case .binomialBetween: return "Try: binomial_between 3, 7, n=10, p=.5"
+            case .binomialAtMost: return "Try: binomial_at_most 3, n=10, p=.5"
+            case .binomialAtLeast: return "Try: binomial_at_least 8, n=10, p=.5"
+            case .poissonPMF: return "Try: poisson_pmf 2, lambda=3"
+            case .poissonCDF: return "Try: poisson_cdf 2, lambda=3"
+            case .poissonBetween: return "Try: poisson_between 1, 4, lambda=3"
+            case .poissonAtMost: return "Try: poisson_at_most 2, lambda=3"
+            case .poissonAtLeast: return "Try: poisson_at_least 5, lambda=3"
+            case .exponentialPDF: return "Try: exponential_pdf 1, rate=2"
+            case .exponentialCDF: return "Try: exponential_cdf 1, rate=2"
+            case .exponentialBetween: return "Try: exponential_between 1, 2, rate=2"
+            case .exponentialInv: return "Try: exponential_inv .95, rate=2"
+            case .uniformPDF: return "Try: uniform_pdf .5, min=0, max=1"
+            case .uniformCDF: return "Try: uniform_cdf .5, min=0, max=1"
+            case .uniformBetween: return "Try: uniform_between .2, .8, min=0, max=1"
+            case .uniformInv: return "Try: uniform_inv .95, min=0, max=1"
+            }
+        }
+
+        init?(_ keyword: Keyword) {
+            switch keyword {
+            case .normalPDF: self = .normalPDF
+            case .normalCDF: self = .normalCDF
+            case .normalBetween: self = .normalBetween
+            case .normalInv: self = .normalInv
+            case .binomialPMF: self = .binomialPMF
+            case .binomialCDF: self = .binomialCDF
+            case .binomialBetween: self = .binomialBetween
+            case .binomialAtMost: self = .binomialAtMost
+            case .binomialAtLeast: self = .binomialAtLeast
+            case .poissonPMF: self = .poissonPMF
+            case .poissonCDF: self = .poissonCDF
+            case .poissonBetween: self = .poissonBetween
+            case .poissonAtMost: self = .poissonAtMost
+            case .poissonAtLeast: self = .poissonAtLeast
+            case .exponentialPDF: self = .exponentialPDF
+            case .exponentialCDF: self = .exponentialCDF
+            case .exponentialBetween: self = .exponentialBetween
+            case .exponentialInv: self = .exponentialInv
+            case .uniformPDF: self = .uniformPDF
+            case .uniformCDF: self = .uniformCDF
+            case .uniformBetween: self = .uniformBetween
+            case .uniformInv: self = .uniformInv
+            default: return nil
+            }
+        }
+    }
+
+    private static func statsForm(_ payload: String, kind: StatsKind) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        var positional: [String] = []
+        var named: [String: String] = [:]
+        var sawNamed = false
+
+        for part in parts where !part.isEmpty {
+            if let assignment = simpleNamedArgument(part) {
+                sawNamed = true
+                guard kind.allowedNamed.contains(assignment.name) else {
+                    return .error(CompileError(
+                        message: "`\(kind.command)` does not take `\(assignment.name)=...`.",
+                        suggestion: kind.example))
+                }
+                guard !assignment.value.isEmpty else {
+                    return .error(CompileError(
+                        message: "`\(kind.command)` needs a value for `\(assignment.name)`.",
+                        suggestion: kind.example))
+                }
+                named[assignment.name] = assignment.value
+            } else {
+                guard !sawNamed else {
+                    return .error(CompileError(
+                        message: "`\(kind.command)` positional values must come before named parameters.",
+                        suggestion: kind.example))
+                }
+                positional.append(part)
+            }
+        }
+
+        guard positional.count == kind.positionalCount,
+              positional.allSatisfy({ !$0.isEmpty })
+        else {
+            return .error(CompileError(
+                message: "`\(kind.command)` needs \(kind.positionalCount) positional value"
+                    + (kind.positionalCount == 1 ? "." : "s."),
+                suggestion: kind.example))
+        }
+
+        for required in kind.requiredNamed where named[required] == nil {
+            return .error(CompileError(
+                message: "`\(kind.command)` needs `\(required)=...`.",
+                suggestion: kind.example))
+        }
+
+        let renderedNamed = kind.allowedNamed.compactMap { friendlyName -> String? in
+            guard let value = named[friendlyName] else { return nil }
+            return "\(sageArgumentName(friendlyName))=\(value)"
+        }
+        let args = positional + renderedNamed
+        let varSource = positional + kind.allowedNamed.compactMap { named[$0] }
+
+        return .success(
+            generatedSage: "\(kind.command)(\(args.joined(separator: ", ")))",
+            requiredVariables: Variables.freeVariables(in: varSource.joined(separator: " ")))
+    }
+
+    private static func simpleNamedArgument(_ text: String) -> (name: String, value: String)? {
+        let parts = text.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return nil }
+        let name = String(parts[0]).trimmedShim
+        guard Variables.isPlausibleVariable(name) else { return nil }
+        return (name: name, value: String(parts[1]).trimmedShim)
+    }
+
+    private static func sageArgumentName(_ friendlyName: String) -> String {
+        switch friendlyName {
+        case "lambda": return "lambda_"
+        case "min": return "low"
+        case "max": return "high"
+        default: return friendlyName
+        }
     }
 
     /// Parse a bracketed variable list `[x, y]`, validating each entry as a

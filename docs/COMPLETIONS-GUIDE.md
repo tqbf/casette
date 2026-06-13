@@ -190,10 +190,48 @@ factor_integer 3600            →   factor(3600)                   chips: expr
 
 ```text
 mean [1, 2, 3]                 →   sum([1, 2, 3])/len([1, 2, 3])  chips: expr
+
+normal_pdf 0                   →   normal_pdf(0)                  chips: x · mean(optional) · sd(optional)
+normal_cdf 1.96                →   normal_cdf(1.96)
+normal_between -1, 1           →   normal_between(-1, 1)
+normal_inv .975                →   normal_inv(.975)
+normal_cdf z, mean=mu, sd=s    →   normal_cdf(z, mean=mu, sd=s)
+
+binomial_pmf 3, n=10, p=.5     →   binomial_pmf(3, n=10, p=.5)    chips: k · n · p
+binomial_cdf 3, n=10, p=.5     →   binomial_cdf(3, n=10, p=.5)
+binomial_between 3, 7, n=10, p=.5
+                                →   binomial_between(3, 7, n=10, p=.5)
+binomial_at_most 3, n=10, p=.5 →   binomial_at_most(3, n=10, p=.5)
+binomial_at_least 8, n=10, p=.5
+                                →   binomial_at_least(8, n=10, p=.5)
+
+poisson_pmf 2, lambda=3        →   poisson_pmf(2, lambda_=3)      chips: k · lambda
+poisson_cdf 2, lambda=3        →   poisson_cdf(2, lambda_=3)
+poisson_between 1, 4, lambda=3 →   poisson_between(1, 4, lambda_=3)
+poisson_at_most 2, lambda=3    →   poisson_at_most(2, lambda_=3)
+poisson_at_least 5, lambda=3   →   poisson_at_least(5, lambda_=3)
+
+exponential_pdf 1, rate=2      →   exponential_pdf(1, rate=2)     chips: x · rate
+exponential_cdf 1, rate=2      →   exponential_cdf(1, rate=2)
+exponential_between 1, 2, rate=2
+                                →   exponential_between(1, 2, rate=2)
+exponential_inv .95, rate=2    →   exponential_inv(.95, rate=2)
+
+uniform_pdf .5, min=0, max=1   →   uniform_pdf(.5, low=0, high=1) chips: x · min · max
+uniform_cdf .5, min=0, max=1   →   uniform_cdf(.5, low=0, high=1)
+uniform_between .2, .8, min=0, max=1
+                                →   uniform_between(.2, .8, low=0, high=1)
+uniform_inv .95, min=0, max=1  →   uniform_inv(.95, low=0, high=1)
 ```
 
 `mean` is an owned lowering — Sage's global `mean()` was removed upstream —
 and stays exact (`mean [1,2,3]` → `2`, not `2.0`).
+
+The distribution commands lower to Casette's preloaded worker helpers, not
+Sage's native distribution objects. Those helpers are available to raw Sage
+input too, but are installed before the symbol-table baseline so they do not
+appear in Symbols unless the user reassigns them. Friendly `lambda=` renders to
+Python-safe `lambda_=`; friendly `min=`/`max=` render to `low=`/`high=`.
 
 ---
 

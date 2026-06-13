@@ -229,4 +229,32 @@ struct PartialEditInvarianceTests {
                      mutate: { $0.digits = "50" }, survives: \.digits, "numeric digits")
         #expect(draft == "numeric pi, 50")
     }
+
+    // MARK: - Statistics (positional holes, named parameters)
+
+    @Test func statsNamedFieldByField() {
+        var draft = "binomial_cdf 3"
+        draft = edit(draft, parse: StatsFormulaIR.parse, render: \.friendlyInput,
+                     mutate: { $0.named["n"] = "10" }, survives: { $0.named["n"] }, "stats n")
+        #expect(draft == "binomial_cdf 3, n=10")
+        draft = edit(draft, parse: StatsFormulaIR.parse, render: \.friendlyInput,
+                     mutate: { $0.named["p"] = ".5" }, survives: { $0.named["p"] }, "stats p")
+        #expect(draft == "binomial_cdf 3, n=10, p=.5")
+    }
+
+    @Test func statsUpperBeforeLower() {
+        var draft = "normal_between"
+        draft = edit(draft, parse: StatsFormulaIR.parse, render: \.friendlyInput,
+                     mutate: {
+                         $0.positional = ["", "1"]
+                     },
+                     survives: \.positional,
+                     "stats upper-first")
+        #expect(draft == "normal_between , 1")
+        draft = edit(draft, parse: StatsFormulaIR.parse, render: \.friendlyInput,
+                     mutate: { $0.positional[0] = "-1" },
+                     survives: \.positional,
+                     "stats lower-after")
+        #expect(draft == "normal_between -1, 1")
+    }
 }

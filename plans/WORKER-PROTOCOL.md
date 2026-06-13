@@ -317,7 +317,9 @@ Each entry is `{name, kind, summary}` (all strings). `symbols` is **sorted by
 The worker snapshots the **pristine namespace** (`_SYMBOL_BASELINE = dict(NS)`)
 *before any user code runs* — i.e. everything `from sage.all import *` injected
 (`var`, `matrix`, `pi`, the predefined `x`, the exported functions `n`/`N`, the
-Gaussian `i`, …), every dunder, all worker plumbing. A name surfaces iff it is:
+Gaussian `i`, …), every dunder, all worker plumbing, and Casette's own hidden
+preload helpers/constants (`normal_cdf`, `binomial_pmf`, `poisson_cdf`,
+`TAU`, `PHI`, etc.; see [PRELOAD.md](PRELOAD.md)). A name surfaces iff it is:
 
 - **absent** from the baseline (a brand-new name — the common case), **or**
 - **present** in the baseline but now bound to a **different object** (the user
