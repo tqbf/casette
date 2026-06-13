@@ -4,10 +4,19 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**610/610**, 93 suites), `make check`,
+Current gates are green: `swift test` (**611/611**, 93 suites), `make check`,
 `make build`, and the worker envelope harness (**97/97**) passed for the
 latest result-action work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest layout work:** The main tape/input boundary and the sidebar's
+top/content boundary are now resizable with app-owned persisted dimensions
+(`inputPaneHeight`, `sidebarTopPaneHeight`) alongside the existing sidebar
+visibility/tab layout keys. The reusable vertical split container clamps panes
+so both sides remain usable and stores changes through `@AppStorage`. The input
+pane layout was tightened after live review: the editor now owns the full pane
+width, with key hints and exactness/status controls moved to a secondary row so
+they do not force an internal editor scrollbar in the middle of the pane.
 
 **Latest maintenance:** Result actions now include **Trig Simplify** for symbolic rows and three basis-producing matrix actions: **Column Space** (`column_space().basis()`), **Row Space** (`row_space().basis()`), and **Right Kernel Basis** (`right_kernel().basis()`). The existing **Simplify** action remains the full simplification path (`simplify_full()`), so no separate `simplify_full` action is exposed. The worker action vocabulary, Swift command mapping, placeholder data, and worker-protocol docs were updated together. A live crash from `right_kernel().basis()` exposed a SwiftMath layout assertion for Sage tuple-list LaTeX (`\left[\left(...\right)\right]`): legacy tuple-list basis LaTeX now falls back before layout, and fresh worker envelopes render Sage `Sequence_generic` values whose elements are vectors as labeled column-vector bases (`\mathcal{B} = \left\{\begin{pmatrix}...\end{pmatrix}\right\}`). Validation: `swift test` **610/610**, `make check`, `make build`, and `v0/03-result-envelope/harness.py` **97/97**. Computer Use live pass on `build/Casette.app`: matrix basis actions rendered one- and two-vector bases in the screenshot-style LaTeX shape, and `sin(x)^2 + cos(x)^2` followed by Trig Simplify produced `1` with no crash.
 

@@ -35,11 +35,46 @@ struct UILayoutPersistenceTests {
         // What RootView's @AppStorage writes…
         defaults.set(false, forKey: UILayout.sidebarVisibleKey)
         defaults.set(SidebarTab.history.rawValue, forKey: UILayout.sidebarTabKey)
+        defaults.set(156.0, forKey: UILayout.inputPaneHeightKey)
+        defaults.set(64.0, forKey: UILayout.sidebarTopPaneHeightKey)
 
         // …is what a relaunch reads back.
         #expect(defaults.bool(forKey: UILayout.sidebarVisibleKey) == false)
         #expect(
             UILayout.sidebarTab(fromStored: defaults.string(forKey: UILayout.sidebarTabKey))
                 == .history)
+        #expect(defaults.double(forKey: UILayout.inputPaneHeightKey) == 156.0)
+        #expect(defaults.double(forKey: UILayout.sidebarTopPaneHeightKey) == 64.0)
+    }
+
+    @Test("split dimensions clamp so both panes stay usable")
+    func splitDimensionsClampToUsableRange() {
+        #expect(
+            UILayout.clampedSplitDimension(
+                10,
+                total: 500,
+                minimumPrimary: 72,
+                minimumSecondary: 180,
+                divider: 8
+            ) == 72
+        )
+        #expect(
+            UILayout.clampedSplitDimension(
+                400,
+                total: 500,
+                minimumPrimary: 72,
+                minimumSecondary: 180,
+                divider: 8
+            ) == 312
+        )
+        #expect(
+            UILayout.clampedSplitDimension(
+                120,
+                total: 500,
+                minimumPrimary: 72,
+                minimumSecondary: 180,
+                divider: 8
+            ) == 120
+        )
     }
 }
