@@ -15,6 +15,10 @@ public struct UnaryFormulaIR: Equatable, Sendable {
         case factor
         case simplify
         case latex
+        case factorial
+        case isPrime
+        case factorInteger
+        case mean
 
         /// The canonical friendly command word (also the rendered prefix).
         public var command: String {
@@ -23,6 +27,10 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .factor: return "factor"
             case .simplify: return "simplify"
             case .latex: return "latex"
+            case .factorial: return "factorial"
+            case .isPrime: return "is_prime"
+            case .factorInteger: return "factor_integer"
+            case .mean: return "mean"
             }
         }
 
@@ -33,6 +41,10 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .factor: return "FACTOR"
             case .simplify: return "SIMPLIFY"
             case .latex: return "LATEX"
+            case .factorial: return "FACTORIAL"
+            case .isPrime: return "IS PRIME"
+            case .factorInteger: return "FACTOR INTEGER"
+            case .mean: return "MEAN"
             }
         }
 
@@ -42,6 +54,10 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .factor: self = .factor
             case .simplify: self = .simplify
             case .latex: self = .latex
+            case .factorial: self = .factorial
+            case .isPrime: self = .isPrime
+            case .factorInteger: self = .factorInteger
+            case .mean: self = .mean
             default: return nil
             }
         }

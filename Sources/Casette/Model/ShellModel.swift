@@ -552,6 +552,21 @@ final class ShellModel {
         return ir
     }
 
+    var varFormula: VarFormulaIR? {
+        guard case let .varDeclaration(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var assumeFormula: AssumeFormulaIR? {
+        guard case let .assume(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var binaryFormula: BinaryFormulaIR? {
+        guard case let .binary(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }

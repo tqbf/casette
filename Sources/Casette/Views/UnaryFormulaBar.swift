@@ -29,6 +29,10 @@ struct UnaryFormulaBar: View {
         case .factor: return "x^2 - 1"
         case .simplify: return "sin(x)^2 + cos(x)^2"
         case .latex: return "integral(sin(x), x)"
+        case .factorial: return "5"
+        case .isPrime: return "104729"
+        case .factorInteger: return "3600"
+        case .mean: return "[1, 2, 3]"
         }
     }
 

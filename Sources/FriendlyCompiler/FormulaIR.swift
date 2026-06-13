@@ -22,6 +22,9 @@ public enum FormulaIR: Equatable, Sendable {
     case vectorCalculus(VectorCalculusFormulaIR)
     case subs(SubsFormulaIR)
     case numeric(NumericFormulaIR)
+    case varDeclaration(VarFormulaIR)
+    case assume(AssumeFormulaIR)
+    case binary(BinaryFormulaIR)
 
     public static func parse(_ draft: String) -> FormulaIR? {
         // Families are keyed by disjoint leading commands, so order is cosmetic.
@@ -39,6 +42,9 @@ public enum FormulaIR: Equatable, Sendable {
         if let ir = VectorCalculusFormulaIR.parse(draft) { return .vectorCalculus(ir) }
         if let ir = SubsFormulaIR.parse(draft) { return .subs(ir) }
         if let ir = NumericFormulaIR.parse(draft) { return .numeric(ir) }
+        if let ir = VarFormulaIR.parse(draft) { return .varDeclaration(ir) }
+        if let ir = AssumeFormulaIR.parse(draft) { return .assume(ir) }
+        if let ir = BinaryFormulaIR.parse(draft) { return .binary(ir) }
         return nil
     }
 
@@ -58,6 +64,9 @@ public enum FormulaIR: Equatable, Sendable {
         case let .vectorCalculus(ir): return ir.friendlyInput
         case let .subs(ir): return ir.friendlyInput
         case let .numeric(ir): return ir.friendlyInput
+        case let .varDeclaration(ir): return ir.friendlyInput
+        case let .assume(ir): return ir.friendlyInput
+        case let .binary(ir): return ir.friendlyInput
         }
     }
 }

@@ -554,6 +554,39 @@ struct ShellModelInputTests {
         #expect(model.draftPreview == .generated("N(pi, digits=50)"))
     }
 
+    @Test("choose formula bar model rewrites friendly IR with filled values")
+    func chooseFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "choose"
+        guard case let .binary(formula0) = model.formulaIR, formula0.kind == .choose else {
+            Issue.record("expected binary(choose) formula")
+            return
+        }
+        #expect(formula0.first.isEmpty)
+        #expect(formula0.second.isEmpty)
+
+        var formula = formula0
+        formula.first = "10"
+        formula.second = "3"
+        model.updateFormula(.binary(formula))
+        #expect(model.draft == "choose 10, 3")
+        #expect(model.binaryFormula?.first == "10")
+        #expect(model.binaryFormula?.second == "3")
+        #expect(model.draftPreview == .generated("binomial(10, 3)"))
+    }
+
+    @Test("assume formula bar model rewrites a condition edit")
+    func assumeFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "assume x > 0"
+        guard case let .assume(formula0) = model.formulaIR else {
+            Issue.record("expected assume formula")
+            return
+        }
+        #expect(formula0.condition == "x > 0")
+        #expect(model.draftPreview == .generated("assume(x > 0)"))
+    }
+
     @Test("multiline drafts preview as raw Sage")
     func multilinePreviewIsRaw() {
         let model = ShellModel()

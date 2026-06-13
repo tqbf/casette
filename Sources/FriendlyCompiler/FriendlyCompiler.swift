@@ -41,6 +41,26 @@ public enum FriendlyCompiler {
         // The remainder after the command word(s).
         let rest = String(input.dropFirst(cmd.matchedPrefix.count)).trimmedShim
 
+        // `var = 3` is an assignment, not the `var` command: the friendly form
+        // declares symbolic names (`var x y`), so a leading `=` means the user is
+        // assigning to a variable literally named `var`. Fall through to the
+        // assignment echo so it stays byte-identical to the pre-`var`-keyword
+        // behavior (`var = 3` → `var = 3\nvar`).
+        if cmd.keyword == .varDeclaration, rest.first == "=" {
+            if let assignment = simpleAssignmentEcho(input) {
+                return assignment
+            }
+            return .bypass(rawSage: input)
+        }
+
+        // `forget` is a no-argument command (clears all assumptions). The exact
+        // bare word yields an empty `rest`, which would otherwise error below; a
+        // bare/`all`/`assumptions` payload lowers to `forget()`. This must run
+        // BEFORE the empty-rest error path.
+        if cmd.keyword == .forget {
+            return forgetForm(rest)
+        }
+
         // A bare command word with no argument: nothing to compile. Treat as raw
         // (the user may have a variable named `factor`, however unlikely) — but
         // more usefully, a structured error guides them.
@@ -90,6 +110,16 @@ public enum FriendlyCompiler {
         case .subs:         return subs(rest)
         case .numeric:      return numeric(rest)
         case .latex:        return latexForm(rest)
+        case .varDeclaration: return varForm(rest)
+        case .assume:       return assumeForm(rest)
+        case .forget:       return forgetForm(rest)
+        case .choose:       return chooseForm(rest)
+        case .gcd:          return gcdLcmForm(rest, fn: "gcd")
+        case .lcm:          return gcdLcmForm(rest, fn: "lcm")
+        case .factorial:    return wrapCall("factorial", rest)
+        case .isPrime:      return wrapCall("is_prime", rest)
+        case .factorInteger: return wrapCall("factor", rest)
+        case .mean:         return meanForm(rest)
         }
     }
 
@@ -103,6 +133,8 @@ public enum FriendlyCompiler {
         case matrix, vector, eigenvalues, rref
         case det, inverse, transpose, rank, eigenvectors
         case gradient, hessian, jacobian, subs, numeric, latex
+        case varDeclaration, assume, forget, choose, gcd, lcm
+        case factorial, isPrime, factorInteger, mean
 
         /// The phrase(s) that introduce this command. Multi-word first so the
         /// matcher prefers "double integral" over "integral".
@@ -137,6 +169,16 @@ public enum FriendlyCompiler {
             case .subs: return ["subs", "substitute"]
             case .numeric: return ["numeric", "approx", "decimal"]
             case .latex: return ["latex"]
+            case .varDeclaration: return ["var"]
+            case .assume: return ["assume"]
+            case .forget: return ["forget"]
+            case .choose: return ["choose"]
+            case .gcd: return ["gcd"]
+            case .lcm: return ["lcm"]
+            case .factorial: return ["factorial"]
+            case .isPrime: return ["is_prime"]
+            case .factorInteger: return ["factor_integer", "prime_factorization"]
+            case .mean: return ["mean"]
             }
         }
 
@@ -173,6 +215,16 @@ public enum FriendlyCompiler {
             case .subs: return "Try: subs x^2 + y, x=3"
             case .numeric: return "Try: numeric pi  or  numeric pi, 50"
             case .latex: return "Try: latex integral(sin(x), x)"
+            case .varDeclaration: return "Try: var a b c"
+            case .assume: return "Try: assume x > 0  or  assume x real"
+            case .forget: return "Try: forget"
+            case .choose: return "Try: choose 10, 3"
+            case .gcd: return "Try: gcd 12, 18  or  gcd [12, 18, 24]"
+            case .lcm: return "Try: lcm 12, 18  or  lcm [12, 18, 24]"
+            case .factorial: return "Try: factorial 5"
+            case .isPrime: return "Try: is_prime 104729"
+            case .factorInteger: return "Try: factor_integer 3600"
+            case .mean: return "Try: mean [1, 2, 3]"
             }
         }
     }
@@ -973,6 +1025,191 @@ public enum FriendlyCompiler {
         return .success(
             generatedSage: "latex(\(expr))",
             requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: var
+
+    /// `var x y z` (space-separated) or `var x, y, z` (commas) →
+    /// `var('x y z')`. Comma split is tried first; a single clause then splits
+    /// on whitespace. Every name must be a plausible identifier. `var()` itself
+    /// creates the names, so nothing is required as a prelude.
+    private static func varForm(_ payload: String) -> CompileResult {
+        let example = "`var` names must be identifiers. Try: var a b c"
+        let clauses = Scanner.splitTopLevelCommas(payload)
+            .map { $0.trimmedShim }
+            .filter { !$0.isEmpty }
+        let names: [String]
+        if clauses.count <= 1 {
+            names = (clauses.first ?? "")
+                .split(whereSeparator: { $0 == " " || $0 == "\t" })
+                .map(String.init)
+        } else {
+            names = clauses
+        }
+        guard !names.isEmpty, names.allSatisfy({ Variables.isPlausibleVariable($0) }) else {
+            return .error(CompileError(
+                message: example,
+                suggestion: "Try: var a b c"))
+        }
+        return .success(
+            generatedSage: "var('\(names.joined(separator: " "))')",
+            requiredVariables: [])
+    }
+
+    // MARK: - Form: assume
+
+    /// Two grammars:
+    ///   * `assume COND` where COND holds a top-level comparison operator
+    ///     (`<`, `>`, `<=`, `>=`, `==`, `!=`) → `assume(COND)` verbatim.
+    ///   * `assume VAR PROP` (optionally `assume VAR is PROP`) → `assume(VAR,
+    ///     'PROP')` for a known property, or `assume(VAR > 0)` / `assume(VAR <
+    ///     0)` for positive/negative.
+    /// A single bare `=` is rejected with a hint to use a comparison.
+    private static func assumeForm(_ payload: String) -> CompileResult {
+        let example = "Try: assume x > 0  or  assume x real"
+        let body = payload.trimmedShim
+
+        if topLevelComparisonOperator(in: body) != nil {
+            return .success(
+                generatedSage: "assume(\(body))",
+                requiredVariables: Variables.freeVariables(in: body))
+        }
+
+        // A bare `=` (assignment, not comparison) is a mistake here.
+        if splitEquation(body) != nil {
+            return .error(CompileError(
+                message: "`assume` needs a comparison like `x > 0`, not `=`.",
+                suggestion: example))
+        }
+
+        // Property grammar: `VAR PROP` or `VAR is PROP`.
+        var words = body.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        if words.count == 3, words[1].lowercased() == "is" {
+            words = [words[0], words[2]]
+        }
+        guard words.count == 2, Variables.isPlausibleVariable(words[0]) else {
+            return .error(CompileError(
+                message: "`assume` is malformed.",
+                suggestion: example))
+        }
+        let variable = words[0]
+        let property = words[1].lowercased()
+        let knownProperties: Set<String> = [
+            "real", "integer", "rational", "complex", "imaginary",
+            "even", "odd", "noninteger",
+        ]
+        let sage: String
+        switch property {
+        case "positive": sage = "assume(\(variable) > 0)"
+        case "negative": sage = "assume(\(variable) < 0)"
+        case _ where knownProperties.contains(property):
+            sage = "assume(\(variable), '\(property)')"
+        default:
+            return .error(CompileError(
+                message: "`assume` property `\(words[1])` is not recognized.",
+                suggestion: example))
+        }
+        return .success(generatedSage: sage, requiredVariables: [variable])
+    }
+
+    /// The first top-level comparison operator in `s` (depth 0 w.r.t. brackets),
+    /// not a bare `=` assignment. Returns the operator text, or nil.
+    private static func topLevelComparisonOperator(in s: String) -> String? {
+        let chars = Array(s)
+        var depth = 0
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            let next = i + 1 < chars.count ? chars[i + 1] : " "
+            switch ch {
+            case "(", "[", "{": depth += 1
+            case ")", "]", "}": depth -= 1
+            case "<" where depth == 0, ">" where depth == 0:
+                return next == "=" ? "\(ch)=" : "\(ch)"
+            case "=" where depth == 0 && next == "=": return "=="
+            case "!" where depth == 0 && next == "=": return "!="
+            default: break
+            }
+            i += 1
+        }
+        return nil
+    }
+
+    // MARK: - Form: forget
+
+    /// The no-argument `forget` (clears all assumptions). Bare, `all`, and
+    /// `assumptions` all lower to `forget()`; anything else is a structured
+    /// error.
+    private static func forgetForm(_ payload: String) -> CompileResult {
+        let body = payload.trimmedShim.lowercased()
+        guard body.isEmpty || body == "all" || body == "assumptions" else {
+            return .error(CompileError(
+                message: "`forget` clears all assumptions.",
+                suggestion: "Try: forget"))
+        }
+        return .success(generatedSage: "forget()", requiredVariables: [])
+    }
+
+    // MARK: - Form: choose
+
+    /// `choose N, K` → `binomial(N, K)` (exactly two clauses).
+    private static func chooseForm(_ payload: String) -> CompileResult {
+        let example = "Try: choose 10, 3"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }) else {
+            return .error(CompileError(
+                message: "`choose` needs two values `n, k`.",
+                suggestion: example))
+        }
+        return .success(
+            generatedSage: "binomial(\(parts[0]), \(parts[1]))",
+            requiredVariables: Variables.freeVariables(in: "\(parts[0]) \(parts[1])"))
+    }
+
+    // MARK: - Form: gcd / lcm
+
+    /// `gcd [12, 18, 24]` → `gcd([12, 18, 24])`; `gcd A, B` → `gcd(A, B)`;
+    /// `gcd A, B, C` → `gcd([A, B, C])`. A single non-bracketed clause errors.
+    private static func gcdLcmForm(_ payload: String, fn: String) -> CompileResult {
+        let example = "Try: \(fn) 12, 18  or  \(fn) [12, 18, 24]"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        let allVars = Variables.freeVariables(in: payload)
+        switch parts.count {
+        case 1:
+            let body = parts[0]
+            guard body.hasPrefix("[") else {
+                return .error(CompileError(
+                    message: "`\(fn)` needs two values or a bracketed list.",
+                    suggestion: example))
+            }
+            return .success(generatedSage: "\(fn)(\(body))", requiredVariables: allVars)
+        case 2:
+            return .success(
+                generatedSage: "\(fn)(\(parts[0]), \(parts[1]))",
+                requiredVariables: allVars)
+        default:
+            return .success(
+                generatedSage: "\(fn)([\(parts.joined(separator: ", "))])",
+                requiredVariables: allVars)
+        }
+    }
+
+    // MARK: - Form: mean
+
+    /// `mean DATA` → `sum(DATA)/len(DATA)` (Sage's global `mean()` is removed
+    /// upstream). DATA is one clause — a bracketed list or a variable — so the
+    /// result stays exact. Multi-clause payloads are an error.
+    private static func meanForm(_ payload: String) -> CompileResult {
+        let example = "Try: mean [1, 2, 3]"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        guard parts.count == 1, let data = parts.first, !data.isEmpty else {
+            return .error(CompileError(
+                message: "`mean` takes one list of data.",
+                suggestion: example))
+        }
+        return .success(
+            generatedSage: "sum(\(data))/len(\(data))",
+            requiredVariables: Variables.freeVariables(in: data))
     }
 
     /// Parse a bracketed variable list `[x, y]`, validating each entry as a
