@@ -26,10 +26,17 @@ struct SessionTapeView: View {
                                 isKernelConnected: model.kernelState.isConnected,
                                 provenanceMark: model.provenanceMark(for: row),
                                 isLiveInKernel: model.rowIsLiveInKernel(row),
+                                canOpenMatrixTable: model.canOpenMatrixTable(
+                                    rowID: row.id,
+                                    rowNumber: index + 1
+                                ),
                                 onSelect: { model.select(row.id) },
                                 onToggleExpanded: { model.toggleExpanded(rowID: row.id) },
                                 onRerun: { model.rerun(rowID: row.id) },
-                                onApproximate: { model.approximateNumerically(rowID: row.id) }
+                                onApproximate: { model.approximateNumerically(rowID: row.id) },
+                                onOpenMatrixTable: {
+                                    model.openMatrixTable(rowID: row.id, rowNumber: index + 1)
+                                }
                             )
                             .id(row.id)
                         }

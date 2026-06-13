@@ -4,10 +4,29 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**638/638**, 97 suites), `make check`,
-`make build`, and the worker envelope harness (**107/107**) passed for the
+Current gates are green: `swift test` (**640/640**, 97 suites), `make check`,
+`make build`, and the worker envelope harness (**108/108**) passed for the
 latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest matrix-table work:** Abbreviated matrix rows now offer a subtle
+`tablecells` pop-out button next to Copy. The affordance appears exactly when
+the matrix card's LaTeX preview uses `\cdots`/`\vdots`; opening it asks Sage for
+the stored tape value via `__casette_tape_refs[#]`, then fetches the hidden
+matrix-table JSON from Sage in chunks so 100x100 tables do not hit the worker's
+8 KiB plain-output cap. The full table's cells come from Sage rather than from
+parsing the abbreviated display. The pop-out is a native resizable window with
+two-axis scrolling, hover row/column feedback, very deemphasized zeros, padded
+column headers, and Esc-to-close. Restored or older-than-reference-window rows
+do not show the table affordance until their value is live in Sage again.
+Follow-up fixes: the table affordance is now persistent instead of hover-only,
+row selection no longer swallows embedded controls, the 100x100 table body uses
+lazy row rendering with a compact accessibility tree to avoid beachballing, and
+the visible app was verified by evaluating `random_matrix(QQ, 100, 100)`,
+clicking the live row's pop-out, opening `Matrix #20`, observing the app settle
+to 0.0% CPU, and closing it with Esc. Validation: `make check`, focused
+matrix-table tests, `make build`, plus the earlier full `swift test` **640/640**
+and worker envelope harness **109/109**.
 
 **Latest crash fix:** SwiftMath parser success is no longer treated as enough
 to render LaTeX. A crash report showed `MTTypesetter.getInterElementSpace`

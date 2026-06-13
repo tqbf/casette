@@ -120,6 +120,21 @@ struct ResultActionTests {
         #expect(row(sage: "2 + 2", status: .running).reusableExpression == nil)
     }
 
+    @Test("matrix table affordance is tied to abbreviated matrix display")
+    func matrixTableExpression() {
+        func row(kind: String = "matrix", latex: String?) -> SessionRow {
+            SessionRow(
+                input: "M", sage: "M",
+                result: PersistedEnvelope(kind: kind, plain: "[1 2]", latex: latex),
+                status: .ok, timestamp: .now)
+        }
+
+        #expect(row(latex: "\\left(\\begin{array}{rrrr}1 & 2\\end{array}\\right)").hasAbbreviatedMatrixDisplay == false)
+        #expect(row(latex: "\\left(\\begin{array}{rrrr}1 & \\cdots & 9\\end{array}\\right)").hasAbbreviatedMatrixDisplay)
+        #expect(row(latex: "\\left(\\begin{array}{r}\\vdots\\end{array}\\right)").hasAbbreviatedMatrixDisplay)
+        #expect(row(kind: "list", latex: "\\cdots").hasAbbreviatedMatrixDisplay == false)
+    }
+
     @Test("Copy Sage snippet: name = value for scalar kinds, bare name otherwise")
     func symbolSageSnippet() {
         #expect(SymbolEntry(name: "n", kind: "integer", summary: "104729").sageSnippet
