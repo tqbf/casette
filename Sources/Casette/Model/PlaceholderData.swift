@@ -10,7 +10,14 @@ enum PlaceholderData {
     // Per-kind actions, verbatim from the frozen WORKER-PROTOCOL.md map.
     private static let integerActions = ["factor", "is_prime", "next_prime", "approx", "hex"]
     private static let rationalActions = ["numerator", "denominator", "approx", "continued_fraction"]
-    private static let symbolicActions = ["simplify", "factor", "expand", "approx", "diff", "integrate"]
+    private static let symbolicActions = [
+        "simplify", "trig_simplify", "factor", "expand", "approx", "diff",
+        "integrate",
+    ]
+    private static let matrixActions = [
+        "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
+        "column_space", "row_space", "right_kernel",
+    ]
     private static let listActions = ["length", "sort", "sum", "set"]
     private static let plotActions = ["save_png", "save_svg", "show"]
     private static let errorActions = ["copy_traceback"]
@@ -99,7 +106,7 @@ enum PlaceholderData {
                     // normalizer rewrites to pmatrix (PROBLEMS.md V0.4).
                     latex: "\\left(\\begin{array}{rr}\n2 & 1 \\\\\n1 & 2\n\\end{array}\\right)",
                     repr: "[2 1]\n[1 2]",
-                    actions: ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"]
+                    actions: matrixActions
                 ),
                 at: at(6.5), duration: 0.0012
             ),

@@ -117,6 +117,24 @@ struct MathContentTests {
         #expect(MathContent.choose(latex: "\\begin{array}{rr}1\\end{nonsense}") == .plain)
     }
 
+    @Test("legacy basis-vector tuple lists fall back before SwiftMath layout")
+    func legacyBasisVectorTupleListFallsBack() {
+        let basis = #"\left[\left(1,\,-2,\,1\right)\right]"#
+        #expect(SageLatexNormalizer.isUnsafeForSwiftMathLayout(
+            SageLatexNormalizer.normalizeForSwiftMath(basis)
+        ))
+        #expect(MathContent.choose(latex: basis) == .plain)
+    }
+
+    @Test("worker basis-vector LaTeX renders as math")
+    func workerBasisVectorLatexRendersAsMath() {
+        let basis = #"\mathcal{B} = \left\{\begin{pmatrix}1 \\ -2 \\ 1\end{pmatrix}\right\}"#
+        #expect(!SageLatexNormalizer.isUnsafeForSwiftMathLayout(
+            SageLatexNormalizer.normalizeForSwiftMath(basis)
+        ))
+        #expect(MathContent.choose(latex: basis) == .math(latex: basis))
+    }
+
     @Test("the cache memoizes and stays consistent across repeat lookups")
     func cacheIsConsistent() {
         let latex = "\\sqrt{2}"
