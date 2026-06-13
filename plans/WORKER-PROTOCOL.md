@@ -485,9 +485,9 @@ Names only; V1.10 maps a chosen action on result `R` to a follow-up eval
 | `rational` | `numerator`, `denominator`, `approx`, `continued_fraction` |
 | `real` | `approx_more_digits`, `round`, `continued_fraction` |
 | `complex` | `real_part`, `imag_part`, `abs`, `arg`, `conjugate` |
-| `symbolic` | `simplify`, `factor`, `expand`, `approx`, `diff`, `integrate` |
+| `symbolic` | `simplify`, `trig_simplify`, `factor`, `expand`, `approx`, `diff`, `integrate` |
 | `relation` | `solve`, `lhs`, `rhs`, `subtract_sides` |
-| `matrix` | `det`, `rank`, `rref`, `eigenvalues`, `transpose`, `inverse` |
+| `matrix` | `det`, `rank`, `rref`, `eigenvalues`, `transpose`, `inverse`, `column_space`, `row_space`, `right_kernel` |
 | `list` | `length`, `sort`, `sum`, `set` |
 | `plot` | `save_png`, `save_svg`, `show` |
 | `text` | `copy` |

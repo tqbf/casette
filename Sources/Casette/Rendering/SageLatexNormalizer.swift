@@ -22,6 +22,17 @@ enum SageLatexNormalizer {
         return rewriteSageArrayMatrices(unwrapped)
     }
 
+    /// SwiftMath can parse Sage's tuple-list basis LaTeX, but measured on
+    /// macOS it can assert while laying out nested `\left[ \left( ... \right) ]`
+    /// groups such as `right_kernel().basis()`. Treat that family as unsupported
+    /// so result cards fall back to the worker's plain text instead of crashing.
+    static func isUnsafeForSwiftMathLayout(_ normalizedLatex: String) -> Bool {
+        normalizedLatex.range(
+            of: #"\\left\[\s*\\left\("#,
+            options: .regularExpression
+        ) != nil
+    }
+
     private static func collapseWhitespace(_ latex: String) -> String {
         latex
             .replacingOccurrences(of: "\r\n", with: " ")

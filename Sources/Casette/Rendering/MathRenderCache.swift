@@ -29,9 +29,13 @@ enum MathRenderCache {
     static func entry(for latex: String) -> Entry {
         if let cached = storage[latex] { return cached }
         let normalized = SageLatexNormalizer.normalizeForSwiftMath(latex)
-        var error: NSError?
-        _ = MTMathListBuilder.build(fromString: normalized, error: &error)
-        let entry = Entry(normalized: normalized, parses: error == nil)
+        var parses = false
+        if !SageLatexNormalizer.isUnsafeForSwiftMathLayout(normalized) {
+            var error: NSError?
+            _ = MTMathListBuilder.build(fromString: normalized, error: &error)
+            parses = error == nil
+        }
+        let entry = Entry(normalized: normalized, parses: parses)
         if storage.count >= capacity { storage.removeAll(keepingCapacity: true) }
         storage[latex] = entry
         return entry

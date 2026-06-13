@@ -24,6 +24,8 @@ struct ResultActionTests {
         let expression = "(x + 1)^2"
         #expect(ResultAction(name: "simplify").command(wrapping: expression)
             == "((x + 1)^2).simplify_full()")
+        #expect(ResultAction(name: "trig_simplify").command(wrapping: "sin(x)^2 + cos(x)^2")
+            == "(sin(x)^2 + cos(x)^2).simplify_trig()")
         #expect(ResultAction(name: "expand").command(wrapping: expression)
             == "expand((x + 1)^2)")
         #expect(ResultAction(name: "factor").command(wrapping: expression)
@@ -52,6 +54,13 @@ struct ResultActionTests {
         #expect(ResultAction(name: "inverse").command(wrapping: m) == "(\(m)).inverse()")
         #expect(ResultAction(name: "eigenvalues").command(wrapping: m) == "(\(m)).eigenvalues()")
         #expect(ResultAction(name: "transpose").command(wrapping: m) == "(\(m)).transpose()")
+        #expect(ResultAction(name: "column_space").command(wrapping: m)
+            == "(\(m)).column_space().basis()")
+        #expect(ResultAction(name: "row_space").command(wrapping: m)
+            == "(\(m)).row_space().basis()")
+        #expect(ResultAction(name: "right_kernel").command(wrapping: m)
+            == "(\(m)).right_kernel().basis()")
+        #expect(ResultAction(name: "column_space").title == "Column Space")
     }
 
     @Test("copy actions copy; plot actions are inert in this tab; unknown degrades visibly")
@@ -71,9 +80,15 @@ struct ResultActionTests {
     func actionsPreserveOrder() {
         let envelope = PersistedEnvelope(
             kind: "matrix", plain: "[1 2]\n[3 4]",
-            actions: ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"])
+            actions: [
+                "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
+                "column_space", "row_space", "right_kernel",
+            ])
         #expect(ResultAction.actions(for: envelope).map(\.name)
-            == ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"])
+            == [
+                "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
+                "column_space", "row_space", "right_kernel",
+            ])
     }
 
     @Test("reusableExpression: ok value rows yes, echoed assignments use the name")

@@ -34,7 +34,8 @@ Response (the V0.3 result envelope)::
       "latex": "\\left(\\begin{array}{rr} 1 & 2 \\\\ 3 & 4 \\end{array}\\right)",
       "repr": "[1 2]\n[3 4]",
       "approx": null,                       # numeric approximation, or null
-      "actions": ["det","rank","rref","eigenvalues","transpose","inverse"],
+      "actions": ["det","rank","rref","eigenvalues","transpose","inverse",
+                  "column_space","row_space","right_kernel"],
       "artifacts": [],
       "truncated": false,                   # was plain/repr capped?
       "stdout": "",
@@ -391,9 +392,15 @@ _ACTIONS = {
     "rational": ["numerator", "denominator", "approx", "continued_fraction"],
     "real": ["approx_more_digits", "round", "continued_fraction"],
     "complex": ["real_part", "imag_part", "abs", "arg", "conjugate"],
-    "symbolic": ["simplify", "factor", "expand", "approx", "diff", "integrate"],
+    "symbolic": [
+        "simplify", "trig_simplify", "factor", "expand", "approx", "diff",
+        "integrate",
+    ],
     "relation": ["solve", "lhs", "rhs", "subtract_sides"],
-    "matrix": ["det", "rank", "rref", "eigenvalues", "transpose", "inverse"],
+    "matrix": [
+        "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
+        "column_space", "row_space", "right_kernel",
+    ],
     "list": ["length", "sort", "sum", "set"],
     "plot": ["save_png", "save_svg", "show"],
     "text": ["copy"],
@@ -493,11 +500,65 @@ def _safe_latex(value):
     We cap LaTeX too: the LaTeX of `list(range(10^6))` is megabytes and useless
     to a renderer."""
     try:
-        s = str(latex(value))  # noqa: F405 (latex from sage.all)
+        s = _vector_sequence_latex(value)
+        if s is None:
+            s = str(latex(value))  # noqa: F405 (latex from sage.all)
     except Exception:
         return None
     capped, _ = _cap(s, _MAX_LATEX)
     return capped
+
+
+def _vector_sequence_latex(value):
+    """Custom LaTeX for a Sage sequence of vectors, e.g. `M.right_kernel().basis()`.
+
+    Sage's default tuple-list shape (`\left[\left(1,\,-2,\,1\right)\right]`)
+    is semantically thin for a vector-space basis and can crash SwiftMath during
+    layout. When the value is specifically a sequence of Sage vectors, render it
+    as a set of column vectors instead. Ordinary lists, solve results, and other
+    sequences keep Sage's own LaTeX.
+    """
+    if type(value).__module__ != "sage.structure.sequence":
+        return None
+
+    try:
+        items = list(value)
+    except Exception:
+        return None
+
+    if not items:
+        try:
+            universe = str(value.universe())
+        except Exception:
+            return None
+        return "\\mathcal{B} = \\varnothing" if "Free module" in universe else None
+
+    if not all(_is_vector_like(item) for item in items):
+        return None
+
+    columns = []
+    for item in items:
+        entries = list(item)
+        if not entries:
+            return None
+        columns.append(
+            "\\begin{pmatrix}"
+            + " \\\\ ".join(str(latex(entry)) for entry in entries)  # noqa: F405
+            + "\\end{pmatrix}")
+
+    return "\\mathcal{B} = \\left\\{" + ", ".join(columns) + "\\right\\}"
+
+
+def _is_vector_like(value):
+    mod = type(value).__module__ or ""
+    if "sage.modules.vector" not in mod:
+        return False
+    try:
+        len(value)
+        iter(value)
+        return True
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------

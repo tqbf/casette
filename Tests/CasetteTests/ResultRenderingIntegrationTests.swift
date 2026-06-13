@@ -50,6 +50,22 @@ struct ResultRenderingIntegrationTests {
             Issue.record("solve envelope carried no latex")
         }
 
+        // Basis-vector lists from matrix space/kernel actions are Sage
+        // `Sequence_generic` values, but their elements are typed vectors. The
+        // worker should render that type as a labeled, safe set of column
+        // vectors, not Sage's default tuple-list LaTeX.
+        let kernelBasis = await controller.evaluate(
+            "matrix([[1,2,3],[2,4,6],[1,1,1]]).right_kernel().basis()")
+        #expect(kernelBasis.result?.kind == "list")
+        #expect(kernelBasis.result?.plain.contains("(1, -2, 1)") == true)
+        if let latex = kernelBasis.result?.latex {
+            #expect(latex.contains("\\mathcal{B} ="))
+            #expect(latex.contains("\\begin{pmatrix}"))
+            #expect(MathContent.choose(latex: latex) == .math(latex: latex))
+        } else {
+            Issue.record("basis envelope carried no latex")
+        }
+
         // A scalar-exact card: rational with the ≈ secondary line.
         let rational = await controller.evaluate("1/3 + 1/5")
         #expect(rational.result?.exact == true)
