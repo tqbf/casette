@@ -21,6 +21,7 @@ struct ShellModelTests {
         #expect(model.rows[0].status == .running)
         #expect(model.rows[0].result == nil)
         #expect(model.rows[0].isPending)
+        #expect(model.selectedRowID == model.rows[0].id)
         #expect(model.kernelState == .notConnected)
         #expect(model.draft.isEmpty)
     }

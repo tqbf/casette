@@ -313,4 +313,46 @@ struct EnvelopeMappingTests {
         #expect(!small.truncated)
         #expect(small.truncation == nil)
     }
+
+    @Test("maps matrix property metadata from worker envelopes")
+    func mapsMatrixProperties() {
+        let response: [String: Any] = [
+            "ok": true, "kind": "matrix", "value": true,
+            "plain": "[1 0]\n[0 1]",
+            "matrix_properties": [
+                ["name": "is_square", "label": "Square", "value": true],
+                ["name": "is_zero", "label": "Zero", "value": false],
+                [
+                    "name": "is_positive_definite",
+                    "label": "Positive Definite",
+                    "error": "TypeError: unable to decide",
+                ],
+            ],
+        ]
+
+        let envelope = PersistedEnvelope(workerResponse: response)
+        #expect(envelope.matrixProperties?.count == 3)
+        #expect(envelope.matrixProperties?[0] == MatrixProperty(
+            name: "is_square", label: "Square", value: true))
+        #expect(envelope.matrixProperties?[1].value == false)
+        #expect(envelope.matrixProperties?[2].value == nil)
+        #expect(envelope.matrixProperties?[2].error?.contains("TypeError") == true)
+    }
+
+    @Test("matrix property metadata is additive Codable data")
+    func matrixPropertiesCodable() throws {
+        let envelope = PersistedEnvelope(
+            kind: "matrix",
+            plain: "[1]",
+            matrixProperties: [
+                MatrixProperty(name: "is_square", label: "Square", value: true),
+            ])
+        let data = try makeEncoder().encode(envelope)
+        let decoded = try makeDecoder().decode(PersistedEnvelope.self, from: data)
+        #expect(decoded.matrixProperties == envelope.matrixProperties)
+
+        let oldData = Data(#"{"kind":"matrix","plain":"[1]","actions":[],"artifacts":[],"truncated":false}"#.utf8)
+        let oldEnvelope = try makeDecoder().decode(PersistedEnvelope.self, from: oldData)
+        #expect(oldEnvelope.matrixProperties == nil)
+    }
 }

@@ -130,6 +130,7 @@ needs to render a row with NO worker**:
 | `approx` / `approxDigits` | `approx` / `approx_digits` | the `≈` secondary line (V0.8) |
 | `exact` / `primaryIsApprox` / `exactValue` | same | exact/numeric display (V0.8) |
 | `actions` | `actions` | the V1.11 actions menu |
+| `matrixProperties` | `matrix_properties` | matrix-only Sage `is_*()` facts for the Inspector (**additive**) |
 | `artifacts` | `artifacts` | plots, **as path refs + liveness** (below) |
 | `truncated` | `truncated` | "N of M chars" affordance |
 | `truncation` | `truncation` | the sizes behind that affordance — `{plainLength, reprLength, plainCap, reprCap}`, optional, present only when `truncated` (**V1.5 additive**; see note below) |

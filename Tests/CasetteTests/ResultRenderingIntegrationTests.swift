@@ -22,6 +22,12 @@ struct ResultRenderingIntegrationTests {
         // into something SwiftMath parses (the V0.4 load-bearing rewrite).
         let matrix = await controller.evaluate("matrix([[1,2],[3,4]])")
         #expect(matrix.result?.kind == "matrix")
+        #expect(matrix.result?.matrixProperties?.contains {
+            $0.name == "is_square" && $0.value == true
+        } == true)
+        #expect(matrix.result?.matrixProperties?.contains {
+            $0.name == "is_zero" && $0.value == false
+        } == true)
         if let latex = matrix.result?.latex {
             #expect(latex.contains("\\begin{array}"))  // the raw Sage shape
             #expect(MathContent.choose(latex: latex) == .math(latex: latex))

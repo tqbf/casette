@@ -198,5 +198,15 @@ enum Theme {
         static let matrixTableCell = Font.callout.monospaced()
         /// Hovered matrix coordinate badge.
         static let matrixTableHover = Font.caption.weight(.medium)
+        /// Matrix property labels in the Inspector.
+        static let matrixPropertyLabel = Font.callout
+        /// Boolean matrix property chips in the Inspector.
+        static let matrixPropertyChip = Font.caption.weight(.medium)
+        /// Sage matrix `is_*()` method names in the Inspector.
+        static let matrixPropertyMethod = Font.caption.monospaced()
+        /// Full matrix property label in the hover popover.
+        static let matrixPropertyTooltipLabel = Font.callout.weight(.medium)
+        /// Sage method call in the hover popover.
+        static let matrixPropertyTooltipMethod = Font.caption.monospaced()
     }
 }

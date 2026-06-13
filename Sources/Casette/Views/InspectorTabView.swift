@@ -13,6 +13,9 @@ struct InspectorTabView: View {
     var body: some View {
         if let row {
             Form {
+                if let properties = row.result?.matrixProperties, row.result?.kind == "matrix" {
+                    MatrixPropertiesInspectorSection(properties: properties)
+                }
                 Section("Result") {
                     if let result = row.result {
                         LabeledContent("Kind", value: result.kind)

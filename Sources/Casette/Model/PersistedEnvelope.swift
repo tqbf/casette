@@ -52,6 +52,9 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
   /// when `truncated` — drives the honest "showing N of M characters" note.
   /// (V1.5 additive field; see the header note.)
   public var truncation: PersistedTruncation?
+  /// Matrix-only boolean facts exported by Sage's `is_*()` methods.
+  /// Additive and optional so older sessions and older workers load cleanly.
+  public var matrixProperties: [MatrixProperty]?
   /// Captured user `print()` / raw-fd output, if any (kept because it's display).
   public var stdout: String?
   public var stderr: String?
@@ -72,6 +75,7 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
     artifacts: [PersistedArtifact] = [],
     truncated: Bool = false,
     truncation: PersistedTruncation? = nil,
+    matrixProperties: [MatrixProperty]? = nil,
     stdout: String? = nil,
     stderr: String? = nil,
     error: PersistedError? = nil
@@ -89,8 +93,26 @@ public struct PersistedEnvelope: Codable, Equatable, Sendable {
     self.artifacts = artifacts
     self.truncated = truncated
     self.truncation = truncation
+    self.matrixProperties = matrixProperties
     self.stdout = stdout
     self.stderr = stderr
+    self.error = error
+  }
+}
+
+/// One Sage matrix `is_*()` result for the Inspector.
+public struct MatrixProperty: Codable, Equatable, Identifiable, Sendable {
+  public var name: String
+  public var label: String
+  public var value: Bool?
+  public var error: String?
+
+  public var id: String { name }
+
+  public init(name: String, label: String, value: Bool? = nil, error: String? = nil) {
+    self.name = name
+    self.label = label
+    self.value = value
     self.error = error
   }
 }
