@@ -84,7 +84,8 @@ explicitly.
   "approx_digits": null,         // precision of `approx` (decimal digits), or null (V0.8)
   "exact": null,                 // true|false|null — is the primary exact? (V0.8)
   "primary_is_approx": false,    // put "≈" on the primary value? (V0.8)
-  "actions": ["det","rank","rref","eigenvalues","transpose","inverse"],
+  "actions": ["det","rank","rref","eigenvalues","transpose","inverse",
+              "column_space","row_space","right_kernel","change_ring_RDF"],
   "artifacts": [],               // V0.5 fills this (plot files etc.)
   "truncated": false,            // was plain/repr capped?
   "stdout": "",                  // user prints / raw fd writes, captured
@@ -489,13 +490,20 @@ Names only; V1.10 maps a chosen action on result `R` to a follow-up eval
 | `complex` | `real_part`, `imag_part`, `abs`, `arg`, `conjugate` |
 | `symbolic` | `simplify`, `trig_simplify`, `factor`, `expand`, `approx`, `diff`, `integrate` |
 | `relation` | `solve`, `lhs`, `rhs`, `subtract_sides` |
-| `matrix` | `det`, `rank`, `rref`, `eigenvalues`, `transpose`, `inverse`, `column_space`, `row_space`, `right_kernel` |
+| `matrix` | `det`, `rank`, `rref`, `eigenvalues`, `transpose`, `inverse`, `column_space`, `row_space`, `right_kernel`, `change_ring_RDF`; plus `svd` when `base_ring()` is `RDF` or `CDF` |
 | `list` | `length`, `sort`, `sum`, `set` |
 | `plot` | `save_png`, `save_svg`, `show` |
 | `text` | `copy` |
 | `boolean` | *(none)* |
 | `unknown` | `repr`, `type` |
 | `error` | `copy_traceback` |
+
+Matrix SVD is deliberately value-aware: exact-ring matrices offer
+`change_ring_RDF` first, and matrices already over Sage's RDF/CDF rings also
+offer `svd`. The Swift command for `svd` evaluates
+`__casette_svd_labeled((M).SVD())`; the helper is installed before the symbol
+baseline, stays hidden from Symbols, and formats Sage's three returned matrices
+as labeled `U`, `S`, and `V` in both `plain` and `latex`.
 
 ---
 

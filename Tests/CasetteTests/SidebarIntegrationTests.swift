@@ -52,6 +52,8 @@ struct SidebarIntegrationTests {
         #expect(row.result?.kind == "matrix")
         // The envelope's own action list drives the tab…
         #expect(row.result?.actions.contains("det") == true)
+        #expect(row.result?.actions.contains("change_ring_RDF") == true)
+        #expect(row.result?.actions.contains("svd") == false)
         // …and the command built from the row's reusable expression
         // evaluates to the real determinant.
         guard let expression = row.reusableExpression,
@@ -91,6 +93,38 @@ struct SidebarIntegrationTests {
             model.rows.count == 4 && model.rows[3].status == .ok
         })
         #expect(model.rows[3].result?.plain.contains("(2, -1)") == true)
+
+        guard let changeRing = ResultAction(name: "change_ring_RDF").command(wrapping: expression)
+        else {
+            Issue.record("matrix row should offer an RDF conversion command")
+            await controller.shutdown()
+            return
+        }
+        #expect(changeRing == "(matrix([[1,2],[3,4]])).change_ring(RDF)")
+        model.evaluateActionCommand(changeRing)
+        #expect(await eventually(timeout: .seconds(120)) { @MainActor in
+            model.rows.count == 5 && model.rows[4].status == .ok
+        })
+        #expect(model.rows[4].result?.kind == "matrix")
+        #expect(model.rows[4].result?.actions.contains("svd") == true)
+
+        guard let rdfExpression = model.rows[4].reusableExpression,
+              let svd = ResultAction(name: "svd").command(wrapping: rdfExpression)
+        else {
+            Issue.record("RDF matrix row should offer SVD")
+            await controller.shutdown()
+            return
+        }
+        model.evaluateActionCommand(svd)
+        #expect(await eventually(timeout: .seconds(120)) { @MainActor in
+            model.rows.count == 6 && model.rows[5].status == .ok
+        })
+        #expect(model.rows[5].result?.plain.contains("U =") == true)
+        #expect(model.rows[5].result?.plain.contains("S =") == true)
+        #expect(model.rows[5].result?.plain.contains("V =") == true)
+        #expect(model.rows[5].result?.latex?.contains("U =") == true)
+        #expect(model.rows[5].result?.latex?.contains("S =") == true)
+        #expect(model.rows[5].result?.latex?.contains("V =") == true)
 
         await controller.shutdown()
     }

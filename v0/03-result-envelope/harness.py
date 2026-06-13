@@ -199,6 +199,28 @@ def main():
               and (len(r["actions"]) > 0 or want_kind == "boolean"),
               f"actions={r.get('actions')!r}")
 
+    r = w.eval("matrix([[1,2],[3,4]])")
+    check("exact matrix offers RDF conversion but not SVD",
+          "change_ring_RDF" in r.get("actions", [])
+          and "svd" not in r.get("actions", []),
+          f"actions={r.get('actions')!r}")
+    r = w.eval("matrix(RDF, [[1,2],[3,4]])")
+    check("RDF matrix offers SVD",
+          "svd" in r.get("actions", []),
+          f"actions={r.get('actions')!r}")
+    r = w.eval("matrix(CDF, [[1,2],[3,4]])")
+    check("CDF matrix offers SVD",
+          "svd" in r.get("actions", []),
+          f"actions={r.get('actions')!r}")
+    r = w.eval("__casette_svd_labeled(matrix(RDF, [[1,2],[3,4]]).SVD())")
+    check("SVD helper produces labeled plain text",
+          r.get("kind") == "list"
+          and all(label in r.get("plain", "") for label in ("U =", "S =", "V =")),
+          f"kind={r.get('kind')!r} plain={r.get('plain')!r}")
+    check("SVD helper produces labeled LaTeX",
+          all(label in r.get("latex", "") for label in ("U =", "S =", "V =")),
+          f"latex={r.get('latex')!r}")
+
     # -- Unknown-object degradation: classify as unknown, plain==repr-ish,
     #    NEVER an error. (Permutation above already covers it; assert explicitly
     #    that ok is true and it didn't fail.) -----------------------------------

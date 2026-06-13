@@ -66,6 +66,21 @@ struct ResultRenderingIntegrationTests {
             Issue.record("basis envelope carried no latex")
         }
 
+        let svd = await controller.evaluate(
+            "__casette_svd_labeled(matrix(RDF, [[1,2],[3,4]]).SVD())")
+        #expect(svd.result?.kind == "list")
+        #expect(svd.result?.plain.contains("U =") == true)
+        #expect(svd.result?.plain.contains("S =") == true)
+        #expect(svd.result?.plain.contains("V =") == true)
+        if let latex = svd.result?.latex {
+            #expect(latex.contains("U ="))
+            #expect(latex.contains("S ="))
+            #expect(latex.contains("V ="))
+            #expect(MathContent.choose(latex: latex) == .math(latex: latex))
+        } else {
+            Issue.record("SVD envelope carried no latex")
+        }
+
         // A scalar-exact card: rational with the ≈ secondary line.
         let rational = await controller.evaluate("1/3 + 1/5")
         #expect(rational.result?.exact == true)
