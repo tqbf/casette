@@ -1342,6 +1342,63 @@ public enum FriendlyCompiler {
         return Range(variable: v, lower: lower, upper: upper)
     }
 
+    /// A tolerant view of a half-typed range clause, for the completion UI's
+    /// IRs. Where `parseRange` is STRICT (it returns nil unless a variable, `..`,
+    /// and BOTH bounds are present — correct for the compiler, which should error
+    /// on incomplete ranges), this preserves whatever the user has typed so the
+    /// formula bar never drops a field mid-edit. Empty bounds become nil.
+    struct PartialRange {
+        let variable: String
+        let lower: String?
+        let upper: String?
+    }
+
+    /// Parse a possibly-incomplete range clause without losing typed text:
+    ///   `v=lo..hi` → (v, lo, hi);  `v=lo..` → (v, lo, nil);  `v=..hi` → (v, nil, hi)
+    ///   `v=..` → (v, nil, nil);    `v=lo` → (v, lo, nil);    `v=` → (v, nil, nil)
+    ///   bare `lo..hi` (no `=`) → ("", lo, hi); `..hi` → ("", nil, hi); etc.
+    /// Returns nil only when the clause is not range-shaped at all (no `=` and no
+    /// `..`, e.g. a bare expression). The variable must be plausible OR empty.
+    static func parsePartialRange(_ clause: String) -> PartialRange? {
+        let c = clause.trimmedShim
+        let variable: String
+        let rangePart: String
+        if let eqIdx = c.firstIndex(of: "=") {
+            // Don't treat `==`/`<=`/`>=`/`!=` as an assignment `=`.
+            let after = c.index(after: eqIdx)
+            if after < c.endIndex, c[after] == "=" { return nil }
+            if eqIdx > c.startIndex {
+                let prev = c[c.index(before: eqIdx)]
+                if prev == "<" || prev == ">" || prev == "!" { return nil }
+            }
+            variable = String(c[c.startIndex..<eqIdx]).trimmedShim
+            rangePart = String(c[after...]).trimmedShim
+            guard variable.isEmpty || Variables.isPlausibleVariable(variable) else { return nil }
+        } else if c.contains("..") {
+            // Bare `lo..hi` form with no variable.
+            variable = ""
+            rangePart = c
+        } else {
+            // Neither `=` nor `..`: not range-shaped.
+            return nil
+        }
+
+        let lowerText: String
+        let upperText: String
+        if let dotRange = rangePart.range(of: "..") {
+            lowerText = String(rangePart[rangePart.startIndex..<dotRange.lowerBound]).trimmedShim
+            upperText = String(rangePart[dotRange.upperBound...]).trimmedShim
+        } else {
+            // `v=lo` with no `..` — the lone value is the lower bound.
+            lowerText = rangePart.trimmedShim
+            upperText = ""
+        }
+        return PartialRange(
+            variable: variable,
+            lower: lowerText.isEmpty ? nil : lowerText,
+            upper: upperText.isEmpty ? nil : upperText)
+    }
+
     private static func rangeError(_ clause: String, example: String) -> CompileError {
         let c = clause.trimmedShim
         if c.contains("..") && c.hasSuffix("..") {

@@ -40,12 +40,13 @@ public struct PlotFormulaIR: Equatable, Sendable {
         let parts = Scanner.splitTopLevelCommas(body)
         let expression = parts.first?.trimmedShim ?? ""
 
-        // Tolerate a missing/malformed range by leaving the bound fields empty —
-        // the bar still shows so the user can fill it in.
-        let range = parts.dropFirst().compactMap { FriendlyCompiler.parseRange($0) }.first
+        // Tolerate a half-typed range without losing typed bounds: `x=0..` keeps
+        // the lower bound rather than dropping the whole range.
+        let range = parts.dropFirst().compactMap { FriendlyCompiler.parsePartialRange($0) }.first
         let freeVariables = Variables.freeVariables(in: expression)
         let inferredVariable = freeVariables.count == 1 ? freeVariables[0] : ""
-        let variable = range?.variable ?? inferredVariable
+        let rangeVariable = range.flatMap { $0.variable.isEmpty ? nil : $0.variable }
+        let variable = rangeVariable ?? inferredVariable
 
         return PlotFormulaIR(
             expression: expression,

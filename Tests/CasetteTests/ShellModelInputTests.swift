@@ -587,6 +587,25 @@ struct ShellModelInputTests {
         #expect(model.draftPreview == .generated("assume(x > 0)"))
     }
 
+    // MARK: - Tab-into-lane guard (Defect 2)
+
+    @Test("Tab enters the formula lane only when a lane is showing and no picker is up")
+    func tabEntersLaneGuard() {
+        // No formula → no lane to enter (Tab keeps its default text behavior).
+        #expect(InputEditor.shouldEnterLane(formulaIR: nil, pendingAmbiguity: nil) == false)
+
+        let model = ShellModel()
+        model.draft = "integral x^2"
+        let formula = model.formulaIR
+        #expect(formula != nil)
+        // A lane is showing and no picker → Tab should enter the lane.
+        #expect(InputEditor.shouldEnterLane(formulaIR: formula, pendingAmbiguity: nil) == true)
+
+        // A pending ambiguity picker owns the keyboard; Tab must NOT steal focus.
+        let picker = PendingAmbiguity(raw: "solve x*y = 1", candidates: ["a", "b"], advances: true)
+        #expect(InputEditor.shouldEnterLane(formulaIR: formula, pendingAmbiguity: picker) == false)
+    }
+
     @Test("multiline drafts preview as raw Sage")
     func multilinePreviewIsRaw() {
         let model = ShellModel()

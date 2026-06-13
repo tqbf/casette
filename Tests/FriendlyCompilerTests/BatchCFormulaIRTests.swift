@@ -130,6 +130,21 @@ struct ImplicitPlotFormulaIRTests {
         #expect(ImplicitPlotFormulaIR.parse("plot sin(x)") == nil)
         #expect(ImplicitPlotFormulaIR.parse("integral x^2") == nil)
     }
+
+    @Test func keepsEquationRightHandSideVerbatim() {
+        // The eq token stores the WHOLE equation (`LHS = RHS`); the `= 1` must
+        // never be dropped at parse time — the on-screen clipping was purely the
+        // token's render width (FormulaTokenField maxWidth), not lost data.
+        guard let ir = ImplicitPlotFormulaIR.parse("implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2") else {
+            Issue.record("expected parse"); return
+        }
+        #expect(ir.equation == "x^2 + y^2 = 1")
+        // And without ranges, the bare equation still keeps its RHS verbatim.
+        guard let bare = ImplicitPlotFormulaIR.parse("implicit_plot x^2 + y^2 = 1") else {
+            Issue.record("expected parse"); return
+        }
+        #expect(bare.equation == "x^2 + y^2 = 1")
+    }
 }
 
 @Suite("Parametric-plot formula IR")

@@ -62,7 +62,8 @@ public struct ParametricPlotFormulaIR: Equatable, Sendable {
             xExpression = pairText
         }
 
-        let range = parts.dropFirst().compactMap { FriendlyCompiler.parseRange($0) }.first
+        // Tolerant: a half-typed range keeps its typed bounds (`t=0..`).
+        let range = parts.dropFirst().compactMap { FriendlyCompiler.parsePartialRange($0) }.first
 
         return ParametricPlotFormulaIR(
             xExpression: xExpression,

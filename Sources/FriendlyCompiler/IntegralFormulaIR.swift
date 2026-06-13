@@ -43,10 +43,14 @@ public struct IntegralFormulaIR: Equatable, Sendable {
 
         let parts = Scanner.splitTopLevelCommas(body)
         let expression = parts.first?.trimmedShim ?? ""
-        let range = parts.dropFirst().compactMap { FriendlyCompiler.parseRange($0) }.first
+        // Tolerant: a half-typed range keeps whatever the user typed (e.g.
+        // `x=0..` keeps the lower bound) instead of being dropped by the strict
+        // compiler-grade parser.
+        let range = parts.dropFirst().compactMap { FriendlyCompiler.parsePartialRange($0) }.first
         let freeVariables = Variables.freeVariables(in: expression)
         let inferredVariable = freeVariables.count == 1 ? freeVariables[0] : ""
-        let variable = range?.variable ?? explicitVariable ?? inferredVariable
+        let rangeVariable = range.map { $0.variable.isEmpty ? nil : $0.variable } ?? nil
+        let variable = rangeVariable ?? explicitVariable ?? inferredVariable
 
         return IntegralFormulaIR(
             expression: expression,

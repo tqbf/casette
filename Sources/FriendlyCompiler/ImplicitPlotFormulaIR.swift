@@ -48,10 +48,9 @@ public struct ImplicitPlotFormulaIR: Equatable, Sendable {
         let parts = Scanner.splitTopLevelCommas(body)
         let equation = parts.first?.trimmedShim ?? ""
 
-        // Tolerate missing/malformed ranges by leaving the bound fields empty.
-        // The two ranges are positional: the first parseable range is x, the
-        // second is y.
-        let ranges = parts.dropFirst().map { FriendlyCompiler.parseRange($0) }
+        // Tolerant: a half-typed range keeps its typed bounds (`x=..`, `x=0..`).
+        // The two ranges are positional: clause 0 is x, clause 1 is y.
+        let ranges = parts.dropFirst().map { FriendlyCompiler.parsePartialRange($0) }
         let xRange = ranges.count >= 1 ? ranges[0] : nil
         let yRange = ranges.count >= 2 ? ranges[1] : nil
 
