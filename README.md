@@ -1,6 +1,6 @@
 ## Casette: a simple CAS calculator and SageMath frontend.
 
-![Casette Screenshot](MDV-SCREEN.png)
+![Casette Screenshot](CASETTE.png)
 
 I spent a year doing Math Academy, starting with a grim confrontation with fractions and ending with multivariable calculus. Starting with MVC, after earning the privilege by grinding months of trig identity integrals, I adopted [SageMath](https://www.sagemath.org/) as my daily companion. 
 
