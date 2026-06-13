@@ -64,6 +64,17 @@ extension SessionRow {
         return ResultAction(name: "approx").command(wrapping: expression)
     }
 
+    /// The tape abbreviates large matrix LaTeX with explicit ellipses. When
+    /// that happens, the row should show the table-view affordance; the table
+    /// content itself is fetched from Sage's stored row value by the model.
+    var hasAbbreviatedMatrixDisplay: Bool {
+        guard result?.kind == "matrix",
+              let latex = result?.latex,
+              latex.contains("\\cdots") || latex.contains("\\vdots")
+        else { return false }
+        return true
+    }
+
     /// Applies a finished evaluation to this (pending) row. Identity, input,
     /// sage, and timestamp are untouched — only the outcome fields change.
     /// Provenance becomes `cached` with `cachedAt = date`, matching the V0.10

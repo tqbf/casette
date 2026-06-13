@@ -190,5 +190,13 @@ enum Theme {
         static let helpCommand = Font.callout.weight(.medium).monospaced()
         /// Generated Sage examples.
         static let helpSage = Font.caption.monospaced()
+        /// Matrix table window title.
+        static let matrixTableTitle = Font.title3.weight(.semibold)
+        /// Matrix table column/row headers.
+        static let matrixTableHeader = Font.caption.weight(.semibold).monospacedDigit()
+        /// Matrix table values.
+        static let matrixTableCell = Font.callout.monospaced()
+        /// Hovered matrix coordinate badge.
+        static let matrixTableHover = Font.caption.weight(.medium)
     }
 }

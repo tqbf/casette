@@ -516,6 +516,24 @@ struct ShellModelInputTests {
         #expect(model.tapeReferences.entries.keys.sorted() == Array(6...25))
     }
 
+    @Test("matrix table opening is limited to abbreviated rows available as Sage tape values")
+    func matrixTableAvailabilityUsesTapeReferences() {
+        let rows = (1...21).map { rowNumber in
+            SessionRow(
+                input: "M\(rowNumber)", sage: "M\(rowNumber)",
+                result: PersistedEnvelope(
+                    kind: "matrix",
+                    plain: "[1 2]",
+                    latex: "\\left(\\begin{array}{rrrr}1 & \\cdots & 9\\end{array}\\right)"
+                ),
+                status: .ok, timestamp: .now
+            )
+        }
+        let model = ShellModel(rows: rows)
+        #expect(!model.canOpenMatrixTable(rowID: model.rows[0].id, rowNumber: 1))
+        #expect(model.canOpenMatrixTable(rowID: model.rows[20].id, rowNumber: 21))
+    }
+
     @Test("subs formula bar model rewrites friendly IR with a bindings edit")
     func subsFormulaModelRewrite() {
         let model = ShellModel()

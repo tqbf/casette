@@ -371,6 +371,59 @@ def __casette_svd_labeled(factors):
     return _CasetteSVDResult(factors)
 
 
+_CASETTE_MATRIX_TABLE_CHUNKS = {}
+_CASETTE_MATRIX_TABLE_NEXT_HANDLE = 0
+
+
+def __casette_matrix_table_json(value):
+    """Return full matrix cells as JSON for Casette's pop-out table view."""
+    if "sage.matrix" not in (type(value).__module__ or ""):
+        raise TypeError("expected a Sage matrix")
+    nrows = value.nrows()
+    ncols = value.ncols()
+    rows = [
+        [str(value[row, col]) for col in range(ncols)]
+        for row in range(nrows)
+    ]
+    return json.dumps({
+        "row_count": nrows,
+        "column_count": ncols,
+        "rows": rows,
+    })
+
+
+def __casette_matrix_table_json_start(value, chunk_size=7000):
+    """Store full matrix-table JSON and return a small chunk manifest."""
+    global _CASETTE_MATRIX_TABLE_NEXT_HANDLE
+    payload = __casette_matrix_table_json(value)
+    chunk_size = int(chunk_size)
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    chunks = [
+        payload[index:index + chunk_size]
+        for index in range(0, len(payload), chunk_size)
+    ]
+    _CASETTE_MATRIX_TABLE_NEXT_HANDLE += 1
+    handle = "matrix_table_%d" % _CASETTE_MATRIX_TABLE_NEXT_HANDLE
+    _CASETTE_MATRIX_TABLE_CHUNKS[handle] = chunks
+    return json.dumps({
+        "handle": handle,
+        "chunk_count": len(chunks),
+        "row_count": value.nrows(),
+        "column_count": value.ncols(),
+    })
+
+
+def __casette_matrix_table_json_chunk(handle, index):
+    chunks = _CASETTE_MATRIX_TABLE_CHUNKS[str(handle)]
+    return chunks[int(index)]
+
+
+def __casette_matrix_table_json_close(handle):
+    _CASETTE_MATRIX_TABLE_CHUNKS.pop(str(handle), None)
+    return True
+
+
 def _install_casette_preloads(ns):
     names = [
         "normal_pdf", "normal_cdf", "normal_between", "normal_inv",
@@ -385,6 +438,10 @@ def _install_casette_preloads(ns):
     for name in names:
         ns[name] = globals()[name]
     ns["__casette_svd_labeled"] = __casette_svd_labeled
+    ns["__casette_matrix_table_json"] = __casette_matrix_table_json
+    ns["__casette_matrix_table_json_start"] = __casette_matrix_table_json_start
+    ns["__casette_matrix_table_json_chunk"] = __casette_matrix_table_json_chunk
+    ns["__casette_matrix_table_json_close"] = __casette_matrix_table_json_close
     ns["TAU"] = 2 * pi  # noqa: F405
     ns["PHI"] = (1 + sqrt(5)) / 2  # noqa: F405
 

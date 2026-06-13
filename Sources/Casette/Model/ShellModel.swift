@@ -766,6 +766,33 @@ final class ShellModel {
         evaluateActionCommand(command, sourceRowID: rowID)
     }
 
+    func canOpenMatrixTable(rowID: SessionRow.ID, rowNumber: Int) -> Bool {
+        guard let row = session.rows.first(where: { $0.id == rowID }) else { return false }
+        return row.hasAbbreviatedMatrixDisplay
+            && rowIsLiveInKernel(row)
+            && tapeReferences.entries[rowNumber] != nil
+    }
+
+    /// Row hover button → full matrix table. The tape only knows that the
+    /// matrix display was abbreviated; the actual cells come from Sage on
+    /// demand through a hidden preload helper.
+    func openMatrixTable(rowID: SessionRow.ID, rowNumber: Int) {
+        guard let row = session.rows.first(where: { $0.id == rowID }),
+              row.hasAbbreviatedMatrixDisplay,
+              rowIsLiveInKernel(row),
+              tapeReferences.entries[rowNumber] != nil,
+              let controller
+        else { return }
+        enqueueKernelWork { [weak self] in
+            let reference = "\(TapeReferenceTable.variableName)[\(rowNumber)]"
+            guard let json = await Self.fetchMatrixTableJSON(reference: reference, controller: controller),
+                  let table = Self.decodeMatrixTable(from: json)
+            else { return }
+            MatrixTableWindowPresenter.show(table: table, title: "Matrix #\(rowNumber)")
+            await self?.refreshSymbols()
+        }
+    }
+
     // MARK: - History navigation (Up/Down)
 
     /// Up: recall the previous submitted input. Acts in single-line mode, or
@@ -831,6 +858,50 @@ final class ShellModel {
         if let snapshot = await controller.fetchSymbols() {
             symbols = snapshot
         }
+    }
+
+    private static func decodeMatrixTable(from json: String?) -> MatrixTableData? {
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(MatrixTableData.self, from: data)
+    }
+
+    private struct MatrixTableChunkManifest: Decodable {
+        let handle: String
+        let chunkCount: Int
+
+        enum CodingKeys: String, CodingKey {
+            case handle
+            case chunkCount = "chunk_count"
+        }
+    }
+
+    private static func decodeMatrixTableChunkManifest(from json: String?) -> MatrixTableChunkManifest? {
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(MatrixTableChunkManifest.self, from: data)
+    }
+
+    private static func fetchMatrixTableJSON(
+        reference: String,
+        controller: SessionController
+    ) async -> String? {
+        let manifestEval = await controller.evaluate("__casette_matrix_table_json_start(\(reference))")
+        guard let manifest = decodeMatrixTableChunkManifest(from: manifestEval.result?.plain),
+              manifest.chunkCount > 0
+        else { return nil }
+
+        var chunks: [String] = []
+        chunks.reserveCapacity(manifest.chunkCount)
+        for index in 0..<manifest.chunkCount {
+            let chunkEval = await controller.evaluate(
+                "__casette_matrix_table_json_chunk('\(manifest.handle)', \(index))")
+            guard let chunk = chunkEval.result?.plain else {
+                _ = await controller.evaluate("__casette_matrix_table_json_close('\(manifest.handle)')")
+                return nil
+            }
+            chunks.append(chunk)
+        }
+        _ = await controller.evaluate("__casette_matrix_table_json_close('\(manifest.handle)')")
+        return chunks.joined()
     }
 
     /// Appends `work` to the serial kernel queue (each item awaits the one

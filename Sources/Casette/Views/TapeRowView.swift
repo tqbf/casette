@@ -20,6 +20,8 @@ struct TapeRowView: View {
     /// False for cached restored rows whose result is visible on the tape but
     /// not present in the current Sage namespace.
     let isLiveInKernel: Bool
+    /// True when Sage has the row's stored value available for table lookup.
+    let canOpenMatrixTable: Bool
     let onSelect: () -> Void
     let onToggleExpanded: () -> Void
     /// Re-evaluates this row's input as a fresh tape row (the plot card's
@@ -30,6 +32,8 @@ struct TapeRowView: View {
     /// context-menu affordance. Offered only when `row.approximateCommand`
     /// exists (the worker listed `approx` for this kind).
     let onApproximate: () -> Void
+    /// Opens a Sage-backed full table view for an abbreviated matrix result.
+    let onOpenMatrixTable: () -> Void
 
     @State private var isHovered = false
 
@@ -54,12 +58,14 @@ struct TapeRowView: View {
                     .monospacedDigit()
                     .help("Tape entry \(rowNumber)")
                     .accessibilityLabel("Tape entry \(rowNumber)")
+                    .onTapGesture(perform: onSelect)
                 Text(row.input)
                     .font(Theme.Fonts.rowInput)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .textSelection(.enabled)
+                    .onTapGesture(perform: onSelect)
                 Spacer(minLength: Theme.inputElementSpacing)
                 Button("Copy Result", systemImage: "doc.on.doc", action: copyPrimary)
                     .buttonStyle(.plain)
@@ -70,6 +76,21 @@ struct TapeRowView: View {
                     .allowsHitTesting(isHovered)
                     .animation(.easeOut(duration: 0.12), value: isHovered)
                     .help("Copy result")
+                if canOpenMatrixTable {
+                    Button(action: onOpenMatrixTable) {
+                        Image(systemName: "tablecells")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .opacity(isHovered ? 1 : 0.72)
+                    .animation(.easeOut(duration: 0.12), value: isHovered)
+                    .help("Open full matrix table")
+                    .accessibilityLabel("Open Matrix Table")
+                    .accessibilityIdentifier("tablecells")
+                }
                 // The V1.9 provenance tag — deliberately QUIET (timestamp
                 // styling): a restored tape shouldn't shout, but cached vs
                 // replayed must be visible where it matters (V0.10's call).
@@ -92,10 +113,14 @@ struct TapeRowView: View {
                 canRunRowActions: isLiveInKernel,
                 onRerun: onRerun
             )
+            .contentShape(.rect)
+            .onTapGesture(perform: onSelect)
             // Structural conditional with NO transition (§1.1) — same
             // precedent as the kernel banner and the ambiguity panel.
             if row.expanded {
                 TapeRowExpandedView(row: row)
+                    .contentShape(.rect)
+                    .onTapGesture(perform: onSelect)
             }
         }
         .opacity(isLiveInKernel ? 1 : 0.58)
@@ -107,7 +132,6 @@ struct TapeRowView: View {
                 .fill(Theme.rowBackground(isSelected: isSelected, isHovered: isHovered))
         )
         .contentShape(.rect)
-        .onTapGesture(perform: onSelect)
         // Selection is a tap gesture (a Button would fight text selection and
         // hover styling), so surface it to assistive tech explicitly.
         .accessibilityAddTraits(.isButton)
@@ -126,6 +150,11 @@ struct TapeRowView: View {
             }
             if let latex = row.result?.latex {
                 Button("Copy LaTeX") { Pasteboard.copy(latex) }
+            }
+            if canOpenMatrixTable {
+                Divider()
+                Button("Open Matrix Table", action: onOpenMatrixTable)
+                    .help("Open full matrix table")
             }
             if let traceback = row.result?.error?.traceback, !traceback.isEmpty {
                 Button("Copy Traceback") { Pasteboard.copy(traceback) }
@@ -160,7 +189,9 @@ struct TapeRowView: View {
             TapeRowView(
                 rowNumber: 1, row: row, isSelected: false, isKernelConnected: false,
                 isLiveInKernel: true,
-                onSelect: {}, onToggleExpanded: {}, onRerun: {}, onApproximate: {}
+                canOpenMatrixTable: true,
+                onSelect: {}, onToggleExpanded: {}, onRerun: {}, onApproximate: {},
+                onOpenMatrixTable: {}
             )
         }
     }

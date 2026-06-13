@@ -238,6 +238,36 @@ def main():
           and "\\vdots" not in r.get("latex", "")
           and "23" in r.get("latex", ""),
           f"latex={r.get('latex')!r}")
+    r = w.eval("__casette_matrix_table_json(matrix(ZZ, 4, 6, range(24)))")
+    try:
+        table = json.loads(r.get("plain", ""))
+    except Exception:
+        table = {}
+    check("matrix table helper returns full Sage cell data",
+          r.get("kind") == "text"
+          and table.get("row_count") == 4
+          and table.get("column_count") == 6
+          and table.get("rows", [[]])[-1][-1] == "23",
+          f"kind={r.get('kind')!r} plain={r.get('plain')!r}")
+    manifest_r = w.eval("__casette_matrix_table_json_start(matrix(ZZ, 100, 100, range(10000)))")
+    try:
+        manifest = json.loads(manifest_r.get("plain", ""))
+        chunks = [
+            w.eval("__casette_matrix_table_json_chunk('%s', %d)" % (manifest["handle"], index)).get("plain", "")
+            for index in range(manifest["chunk_count"])
+        ]
+        w.eval("__casette_matrix_table_json_close('%s')" % manifest["handle"])
+        table = json.loads("".join(chunks))
+    except Exception:
+        manifest = {}
+        table = {}
+    check("matrix table helper chunks avoid the normal 8 KiB envelope cap",
+          manifest_r.get("kind") == "text"
+          and manifest.get("chunk_count", 0) > 1
+          and table.get("row_count") == 100
+          and table.get("column_count") == 100
+          and table.get("rows", [[]])[-1][-1] == "9999",
+          f"manifest={manifest!r} table_tail={table.get('rows', [[]])[-1][-1:] if table else None}")
     r = w.eval("matrix(ZZ, 6, 6, range(36))")
     check("large matrix uses both row and column abbreviation",
           "\\cdots" in r.get("latex", "")
