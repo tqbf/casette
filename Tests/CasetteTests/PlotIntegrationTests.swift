@@ -83,7 +83,7 @@ struct PlotIntegrationTests {
         // The V1.7 live gate failed here: through the real app path (the
         // ShellModel, whose boot prelude is the ONLY variable setup) an
         // upstream-docs-verbatim implicit_plot NameError'd on `y`. The boot
-        // prelude is now `var('x, y, z, t')` — this must just work, with a
+        // prelude covers `x` and `y` — this must just work, with a
         // present, decodable PNG.
         let controller = SessionController(transportFactory: SageTestEnvironment.factory)
         let model = ShellModel()

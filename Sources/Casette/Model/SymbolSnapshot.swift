@@ -16,4 +16,9 @@ struct SymbolSnapshot: Equatable, Sendable {
     var capturedAt: Date?
 
     static let empty = SymbolSnapshot(entries: [], capturedAt: nil)
+
+    func visibleEntries(showingBuiltinSymbols: Bool) -> [SymbolEntry] {
+        guard !showingBuiltinSymbols else { return entries }
+        return entries.filter { !$0.isUntouchedBootVariable }
+    }
 }

@@ -9,4 +9,9 @@ extension FocusedValues {
     /// `SageCommands` (Restart Sage / Interrupt Evaluation) can reach the
     /// kernel and read its state for menu enablement.
     @Entry var shellModel: ShellModel?
+
+    /// Opens the focused window's Clear Tape confirmation dialog. Kept on
+    /// `RootView` so toolbar and menu actions share the same destructive
+    /// confirmation path.
+    @Entry var confirmClearTape: (() -> Void)?
 }

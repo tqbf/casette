@@ -189,18 +189,17 @@ exactly what `e2e.py` does and what proves the pipeline end-to-end. Rationale:
   session level. The always-declare `var('V')` policy below is unchanged and
   still load-bearing for every other variable.)*
   *(Extension, V1.7 fix round — a DELIBERATE deviation from strict REPL
-  fidelity, approved product call: the boot prelude is now
-  `var('x, y, z, t')`. The real REPL predefines only `x`, but the V1.7 live
-  gate showed `implicit_plot(x^2+y^2==1, (x,-2,2), (y,-2,2))` — written
-  exactly as the upstream Sage docs write it — NameError'ing on `y` out of
-  the box, because raw-Sage input bypasses the friendly compiler and so gets
-  no `var('V')` preludes. Casette is a calculator, not a REPL clone: the
-  conventional calculator variables `x y z t` cover implicit/parametric/3D
-  doc examples verbatim, all four show honestly in the Symbols sidebar from
-  boot, and declaring is idempotent so the friendly preludes on top remain
-  harmless. Anything beyond those four is still the friendly compiler's
-  `var('V')` prelude or the user's own `var(...)` — the always-declare
-  policy below is unchanged.)*
+  fidelity, approved product call: the boot prelude declared conventional
+  calculator variables beyond `x`. The real REPL predefines only `x`, but the
+  V1.7 live gate showed `implicit_plot(x^2+y^2==1, (x,-2,2), (y,-2,2))` —
+  written exactly as the upstream Sage docs write it — NameError'ing on `y` out
+  of the box, because raw-Sage input bypasses the friendly compiler and so gets
+  no `var('V')` preludes. Casette is a calculator, not a REPL clone: the boot
+  prelude now covers `u v w x y z`, coordinate subscripts `x1`...`x9` and
+  `y1`...`y9`, plus `t`. These show honestly in the Symbols sidebar from boot,
+  and declaring is idempotent so the friendly preludes on top remain harmless.
+  Anything beyond that set is still the friendly compiler's `var('V')` prelude
+  or the user's own `var(...)` — the always-declare policy below is unchanged.)*
 - Declaring is idempotent and cheap; re-`var('x')` over an existing `x` is
   harmless. V1.4 may optimize by skipping vars the live `symbols` op (V0.6)
   already shows declared, but the simple "always declare required" path is proven.

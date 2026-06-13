@@ -8,6 +8,7 @@ import SwiftUI
 /// items so they're discoverable; both disable honestly when they can't act.
 struct SageCommands: Commands {
     @FocusedValue(\.shellModel) private var model: ShellModel?
+    @FocusedValue(\.confirmClearTape) private var confirmClearTape: (() -> Void)?
 
     var body: some Commands {
         CommandMenu("Sage") {
@@ -66,6 +67,11 @@ struct SageCommands: Commands {
                 model?.replaySession()
             }
             .disabled(model?.canReplaySession != true)
+
+            Button("Clear Tape…") {
+                confirmClearTape?()
+            }
+            .disabled(model?.canClearTape != true || confirmClearTape == nil)
         }
     }
 }

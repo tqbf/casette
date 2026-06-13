@@ -55,4 +55,23 @@ struct PlaceholderDataTests {
         #expect(names == names.sorted())
         #expect(!PlaceholderData.symbols.entries.isEmpty)
     }
+
+    @Test("symbol visibility can hide untouched boot variables")
+    func symbolVisibilityHidesUntouchedBootVariables() {
+        let snapshot = SymbolSnapshot(entries: [
+            SymbolEntry(name: "n", kind: "integer", summary: "104729"),
+            SymbolEntry(name: "x", kind: "symbolic", summary: "x"),
+            SymbolEntry(name: "x1", kind: "symbolic variable", summary: "x1"),
+            SymbolEntry(name: "y", kind: "integer", summary: "5"),
+        ], capturedAt: nil)
+
+        #expect(
+            snapshot.visibleEntries(showingBuiltinSymbols: false).map(\.name)
+                == ["n", "y"]
+        )
+        #expect(
+            snapshot.visibleEntries(showingBuiltinSymbols: true).map(\.name)
+                == ["n", "x", "x1", "y"]
+        )
+    }
 }
