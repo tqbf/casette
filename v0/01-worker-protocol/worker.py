@@ -583,6 +583,7 @@ KINDS = (
 _MAX_PLAIN = 8192   # chars kept for `plain`
 _MAX_REPR = 8192    # chars kept for `repr`
 _MAX_LATEX = 16384  # chars kept for `latex` (LaTeX of a huge object is useless)
+_MAX_STDOUT = 32768  # chars kept for captured stdout/stderr
 _ELLIPSIS = " …"
 
 
@@ -618,6 +619,19 @@ def _cap(text, limit):
     if len(text) <= limit:
         return text, False
     return text[:limit] + _ELLIPSIS, True
+
+
+def _cap_captured_stream(text, name):
+    """Cap captured stdout/stderr so help() cannot freeze the app UI."""
+    capped, truncated = _cap(text, _MAX_STDOUT)
+    if not truncated:
+        return capped
+    omitted = len(text) - _MAX_STDOUT
+    return (
+        capped
+        + "\n\n[Casette truncated %s after %d characters; %d characters omitted.]"
+        % (name, _MAX_STDOUT, omitted)
+    )
 
 
 def _classify(value):
@@ -1322,8 +1336,8 @@ def _handle_eval(req):
     try:
         with _capture() as (out_buf, err_buf):
             has_value, value = _eval_code(src)
-        out_text = out_buf.getvalue()
-        err_text = err_buf.getvalue()
+        out_text = _cap_captured_stream(out_buf.getvalue(), "stdout")
+        err_text = _cap_captured_stream(err_buf.getvalue(), "stderr")
     except KeyboardInterrupt:
         # SIGINT from the parent: report a distinct `interrupted` envelope so
         # the parent's state machine can move running -> interrupted (vs error).

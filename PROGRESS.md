@@ -9,6 +9,17 @@ Current gates are green: `swift test` (**630/630**, 95 suites), `make check`,
 latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
 
+**Latest bug fix:** Sage help output no longer makes the app appear hung.
+`help(x)` for a symbolic expression can emit hundreds of KB of pydoc text; the
+worker now caps captured stdout/stderr at 32,768 characters and appends a visible
+truncation note, so the existing stdout block can show Sage help text without
+overwhelming SwiftUI. The stdout view also renders only a 16,384-character
+preview for restored rows, so a pre-fix persisted help row cannot slow app
+startup. The V0.1 worker harness now covers `help(x)` as bounded stdout.
+Validation: worker harness **19/19**, focused stdout display tests, `make check`,
+`swift test` **632/632**, and `make build` green.
+Details: [`progress/000-2026-06-13-sage-help-stdout-cap.md`](progress/000-2026-06-13-sage-help-stdout-cap.md).
+
 **Latest statistics work:** [plans/STAT.md](plans/STAT.md)'s first and second
 batches are implemented, backed by [plans/PRELOAD.md](plans/PRELOAD.md)'s
 hidden worker preloads. The canonical worker now installs normal, binomial,

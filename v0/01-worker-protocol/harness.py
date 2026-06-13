@@ -179,6 +179,17 @@ def main():
           r["ok"] and r["stdout"] == "hello\n" and r["value"] is False,
           f'stdout={r["stdout"]!r}')
 
+    # Sage help text can be very large (e.g. symbolic expressions). It should
+    # still come back as captured stdout, but bounded so the app can render it.
+    r = w.request({"id": "t7h", "code": "help(x)"})
+    show(r)
+    check("help(x) captured as bounded stdout",
+          (r["ok"] and r["value"] is False and r["kind"] == "none"
+           and "Help on Expression" in r["stdout"]
+           and "Casette truncated stdout" in r["stdout"]
+           and len(r["stdout"]) < 33500),
+          f'stdout_len={len(r.get("stdout", ""))}')
+
     # Raw fd-level writes (the Cython hazard): os.write(1/2, ...) bypasses
     # Python's sys.stdout. Must still be captured, framing intact.
     r = w.request({"id": "t7b",
