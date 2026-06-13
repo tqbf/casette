@@ -21,6 +21,7 @@ enum Theme {
     static let sidebarMaxWidth: CGFloat = 400
 
     // MARK: Tape
+    static let tapeMinHeight: CGFloat = 180
     static let tapeInset: CGFloat = 16
     /// Bottom content margin of the tape's scroll view (a scroll-content
     /// inset, not a spacer view), so the last row — including multi-line
@@ -72,6 +73,7 @@ enum Theme {
     static let tracebackMaxHeight: CGFloat = 180
 
     // MARK: Input pane
+    static let inputMinHeight: CGFloat = 72
     static let inputPaddingHorizontal: CGFloat = 16
     static let inputPaddingVertical: CGFloat = 12
     static let inputElementSpacing: CGFloat = 8
@@ -111,6 +113,8 @@ enum Theme {
 
     // MARK: Sidebar content
     static let sidebarSectionPadding: CGFloat = 10
+    static let sidebarTabStripMinHeight: CGFloat = 44
+    static let sidebarContentMinHeight: CGFloat = 160
     /// Indent of an action row's command preview under its title, aligning
     /// it with the title text after the Label's icon column.
     static let actionCommandIndent: CGFloat = 24

@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// The bottom input pane — the calculator line. An expanding editor
-/// (single-line by default, multiline via Shift-Return) over the live
-/// generated-Sage preview, with keycap hints and the kernel status indicator
-/// at the trailing edge.
+/// (single-line by default, multiline via Shift-Return) over a compact control
+/// row and live generated-Sage preview. The editor gets the full pane width;
+/// controls never squeeze it into an early internal scroll.
 ///
 /// Ambiguous submissions present their candidates in an INLINE overlay
 /// floated directly above the pane — same window, so the editor keeps
@@ -29,22 +29,23 @@ struct InputPaneView: View {
                     .accessibilityHidden(true)
                 InputEditor(model: model, isFocused: isFocused)
                     .frame(maxWidth: .infinity)
+            }
+            HStack(alignment: .center, spacing: Theme.inputElementSpacing) {
                 // Always mounted, opacity-faded (never insert/remove — §1.1).
                 Text("⏎ evaluate   ⇧⏎ newline")
                     .font(Theme.Fonts.meta)
                     .foregroundStyle(.tertiary)
                     .opacity(model.draft.isEmpty ? 0 : 1)
                     .animation(.easeOut(duration: 0.15), value: model.draft.isEmpty)
-                    .padding(.top, Theme.inputAccessoryTopPadding)
                     .accessibilityHidden(true)
+                Spacer(minLength: Theme.inputElementSpacing)
                 // The V1.8 exact/numeric controls: session-scoped, so they
                 // live with the input (next to the kernel status), not in
                 // Settings.
                 ExactnessControls(model: model)
-                    .padding(.top, Theme.inputControlTopPadding)
                 KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
-                    .padding(.top, Theme.inputAccessoryTopPadding)
             }
+            .padding(.leading, Theme.inputFormulaLeadingInset)
             if let formula = model.formulaIR {
                 FormulaBarView(model: model, formula: formula)
                     .padding(.leading, Theme.inputFormulaLeadingInset)

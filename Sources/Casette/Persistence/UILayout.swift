@@ -16,10 +16,29 @@ import Foundation
 enum UILayout {
     static let sidebarVisibleKey = "sidebarVisible"
     static let sidebarTabKey = "sidebarTab"
+    static let inputPaneHeightKey = "inputPaneHeight"
+    static let sidebarTopPaneHeightKey = "sidebarTopPaneHeight"
+
+    static let defaultInputPaneHeight: Double = 118
+    static let defaultSidebarTopPaneHeight: Double = 52
+
+    static let splitHandleThickness: CGFloat = 7
 
     /// Decodes a stored tab raw value, falling back to the V1.1 default
     /// (Symbols) for an unknown/missing value.
     static func sidebarTab(fromStored rawValue: String?) -> SidebarTab {
         rawValue.flatMap(SidebarTab.init(rawValue:)) ?? .symbols
+    }
+
+    static func clampedSplitDimension(
+        _ value: Double,
+        total: Double,
+        minimumPrimary: Double,
+        minimumSecondary: Double,
+        divider: Double = Double(splitHandleThickness)
+    ) -> Double {
+        let available = max(0, total - divider)
+        let upperBound = max(minimumPrimary, available - minimumSecondary)
+        return min(max(value, minimumPrimary), upperBound)
     }
 }

@@ -19,6 +19,10 @@ struct RootView: View {
     /// stays on `ShellModel` (sidebar flows switch tabs); this is just the
     /// durable copy, synced both ways below.
     @AppStorage(UILayout.sidebarTabKey) private var storedSidebarTab = SidebarTab.symbols.rawValue
+    @AppStorage(UILayout.inputPaneHeightKey) private var inputPaneHeight =
+        UILayout.defaultInputPaneHeight
+    @AppStorage(UILayout.sidebarTopPaneHeightKey) private var sidebarTopPaneHeight =
+        UILayout.defaultSidebarTopPaneHeight
     @State private var isConfirmingClearTape = false
     @FocusState private var isInputFocused: Bool
 
@@ -28,27 +32,23 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        VStack(spacing: 0) {
-            SessionTapeView(model: model)
-            Divider()
-            // The kernel recovery banner: shown only when the kernel is
-            // unavailable for a reason the user should see. Plain structural
-            // conditional — no transition (SWIFTUI-RULES §1.1 is about
-            // animated insert/remove).
-            if let issue = model.kernelIssue {
-                KernelIssueBanner(
-                    message: issue,
-                    isSetupFailure: model.kernelSetupFailed,
-                    restart: model.restartKernel,
-                    openDoctor: model.openDoctor
-                )
-                Divider()
-            }
+        PersistentVerticalSplitView(
+            persistedDimension: $inputPaneHeight,
+            persistedPane: .bottom,
+            minimumTopHeight: Theme.tapeMinHeight,
+            minimumBottomHeight: Theme.inputMinHeight
+        ) {
+            SessionTapeRegionView(model: model)
+        } bottom: {
             InputPaneView(model: model, isFocused: $isInputFocused)
         }
         .frame(minWidth: Theme.windowMinWidth, minHeight: Theme.windowMinHeight)
         .inspector(isPresented: $isSidebarPresented) {
-            SidebarView(model: model, focusInput: focusInput)
+            SidebarView(
+                model: model,
+                topPaneHeight: $sidebarTopPaneHeight,
+                focusInput: focusInput
+            )
                 .inspectorColumnWidth(
                     min: Theme.sidebarMinWidth,
                     ideal: Theme.sidebarIdealWidth,
