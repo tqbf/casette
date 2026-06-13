@@ -35,7 +35,7 @@ Response (the V0.3 result envelope)::
       "repr": "[1 2]\n[3 4]",
       "approx": null,                       # numeric approximation, or null
       "actions": ["det","rank","rref","eigenvalues","transpose","inverse",
-                  "column_space","row_space","right_kernel"],
+                  "column_space","row_space","right_kernel","change_ring_RDF"],
       "artifacts": [],
       "truncated": false,                   # was plain/repr capped?
       "stdout": "",
@@ -331,6 +331,45 @@ def uniform_inv(p, low, high):
     return low + p * (high - low)
 
 
+class _CasetteSVDResult:
+    """Display wrapper for Sage's three-matrix SVD tuple.
+
+    Sage returns `(U, S, V)` as a tuple. A tuple's default LaTeX is unlabeled,
+    which makes the tape hard to read. This wrapper keeps the plain fallback
+    simple and gives the math renderer an explicit `U`, `S`, `V` display.
+    """
+
+    def __init__(self, factors):
+        self.factors = tuple(factors)
+        if len(self.factors) != 3:
+            raise ValueError("SVD() did not return three matrices")
+
+    def __iter__(self):
+        return iter(self.factors)
+
+    def __len__(self):
+        return len(self.factors)
+
+    def __str__(self):
+        labels = ("U", "S", "V")
+        return "\n\n".join("%s =\n%s" % (label, matrix)
+                           for label, matrix in zip(labels, self.factors))
+
+    def __repr__(self):
+        return "_CasetteSVDResult(%r)" % (self.factors,)
+
+    def _latex_(self):
+        labels = ("U", "S", "V")
+        pieces = []
+        for label, matrix in zip(labels, self.factors):
+            pieces.append("%s = %s" % (label, latex(matrix)))  # noqa: F405
+        return "\\qquad ".join(pieces)
+
+
+def __casette_svd_labeled(factors):
+    return _CasetteSVDResult(factors)
+
+
 def _install_casette_preloads(ns):
     names = [
         "normal_pdf", "normal_cdf", "normal_between", "normal_inv",
@@ -344,6 +383,7 @@ def _install_casette_preloads(ns):
     ]
     for name in names:
         ns[name] = globals()[name]
+    ns["__casette_svd_labeled"] = __casette_svd_labeled
     ns["TAU"] = 2 * pi  # noqa: F405
     ns["PHI"] = (1 + sqrt(5)) / 2  # noqa: F405
 
@@ -668,6 +708,9 @@ def _classify(value):
     if "sage.matrix" in mod:
         return "matrix"
 
+    if isinstance(value, _CasetteSVDResult):
+        return "list"
+
     if "sage.symbolic.expression" in mod:
         # Relations (==, <, >, …) share the Expression type but are their own
         # kind: they drive a different action menu (solve, lhs, rhs).
@@ -775,6 +818,26 @@ def _is_vector_like(value):
         return True
     except Exception:
         return False
+
+
+def _matrix_base_ring_is_rdf_or_cdf(value):
+    try:
+        base_ring = value.base_ring()
+    except Exception:
+        return False
+    try:
+        return bool(base_ring == RDF or base_ring == CDF)  # noqa: F405
+    except Exception:
+        return str(base_ring) in ("Real Double Field", "Complex Double Field")
+
+
+def _actions_for(value, kind):
+    actions = list(_ACTIONS.get(kind, []))
+    if kind == "matrix":
+        actions.append("change_ring_RDF")
+        if _matrix_base_ring_is_rdf_or_cdf(value):
+            actions.append("svd")
+    return actions
 
 
 # ---------------------------------------------------------------------------
@@ -991,7 +1054,7 @@ def _build_envelope(value, artifacts=None, digits=None, numeric=False):
     repr_s, repr_trunc = _cap(repr_full, _MAX_REPR)
     truncated = plain_trunc or repr_trunc
 
-    actions = list(_ACTIONS.get(kind, []))
+    actions = _actions_for(value, kind)
 
     env = {
         "kind": kind,

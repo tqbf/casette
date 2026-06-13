@@ -74,6 +74,15 @@ menu command that opens the same confirmation dialog.
 
 **Latest maintenance:** Result actions now include **Trig Simplify** for symbolic rows and three basis-producing matrix actions: **Column Space** (`column_space().basis()`), **Row Space** (`row_space().basis()`), and **Right Kernel Basis** (`right_kernel().basis()`). The existing **Simplify** action remains the full simplification path (`simplify_full()`), so no separate `simplify_full` action is exposed. The worker action vocabulary, Swift command mapping, placeholder data, and worker-protocol docs were updated together. A live crash from `right_kernel().basis()` exposed a SwiftMath layout assertion for Sage tuple-list LaTeX (`\left[\left(...\right)\right]`): legacy tuple-list basis LaTeX now falls back before layout, and fresh worker envelopes render Sage `Sequence_generic` values whose elements are vectors as labeled column-vector bases (`\mathcal{B} = \left\{\begin{pmatrix}...\end{pmatrix}\right\}`). Validation: `swift test` **610/610**, `make check`, `make build`, and `v0/03-result-envelope/harness.py` **97/97**. Computer Use live pass on `build/Casette.app`: matrix basis actions rendered one- and two-vector bases in the screenshot-style LaTeX shape, and `sin(x)^2 + cos(x)^2` followed by Trig Simplify produced `1` with no crash.
 
+**Matrix action extension:** Matrix result actions now always include **Change
+Ring to RDF** (`change_ring(RDF)`). Matrices whose base ring is already `RDF` or
+`CDF` also include **SVD**; the Swift action evaluates
+`__casette_svd_labeled((M).SVD())`, and the worker's hidden preload helper
+renders Sage's returned `(U, S, V)` triple as labeled `U = ...`, `S = ...`, and
+`V = ...` matrices in both plain text and LaTeX. The action vocabulary,
+placeholder rows, worker-protocol docs, worker harness, Swift action tests, and
+real-Sage rendering/sidebar journeys were updated together.
+
 **Previous maintenance:** Tape entries are now visibly numbered, and prompts can reuse the last 20 successful reusable tape expressions with `#ROW` syntax. Errors still occupy row numbers but are not valid references; missing/stale references surface as normal compile-preview errors. `#57` expands before friendly compilation to the private Sage dictionary lookup `__casette_tape_refs[57]`, and the worker dictionary is refreshed after successful evals and during Replay Session so restored sessions can rebuild reference state. The private dictionary is filtered out of the Symbols sidebar because it is app plumbing, not user-serviceable state. The app's default approximation precision is now 5 digits (configured at boot over the worker's native 10), and the precision menu includes 2- and 3-digit choices. Tests cover reference expansion, missing references, error-skipping with visible row numbers, the 20-entry window, replay rebuild, symbol filtering, default precision, and existing numeric/queue semantics; `swift test` is green at **302/302**.
 
 **Formula autocomplete prototype:** The input pane now grows a compact

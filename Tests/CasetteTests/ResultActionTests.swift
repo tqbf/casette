@@ -60,7 +60,13 @@ struct ResultActionTests {
             == "(\(m)).row_space().basis()")
         #expect(ResultAction(name: "right_kernel").command(wrapping: m)
             == "(\(m)).right_kernel().basis()")
+        #expect(ResultAction(name: "change_ring_RDF").command(wrapping: m)
+            == "(\(m)).change_ring(RDF)")
+        #expect(ResultAction(name: "svd").command(wrapping: m)
+            == "__casette_svd_labeled((\(m)).SVD())")
         #expect(ResultAction(name: "column_space").title == "Column Space")
+        #expect(ResultAction(name: "change_ring_RDF").title == "Change Ring to RDF")
+        #expect(ResultAction(name: "svd").title == "SVD")
     }
 
     @Test("copy actions copy; plot actions are inert in this tab; unknown degrades visibly")
@@ -82,12 +88,12 @@ struct ResultActionTests {
             kind: "matrix", plain: "[1 2]\n[3 4]",
             actions: [
                 "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
-                "column_space", "row_space", "right_kernel",
+                "column_space", "row_space", "right_kernel", "change_ring_RDF",
             ])
         #expect(ResultAction.actions(for: envelope).map(\.name)
             == [
                 "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
-                "column_space", "row_space", "right_kernel",
+                "column_space", "row_space", "right_kernel", "change_ring_RDF",
             ])
     }
 

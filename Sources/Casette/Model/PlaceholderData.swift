@@ -16,7 +16,7 @@ enum PlaceholderData {
     ]
     private static let matrixActions = [
         "det", "rank", "rref", "eigenvalues", "transpose", "inverse",
-        "column_space", "row_space", "right_kernel",
+        "column_space", "row_space", "right_kernel", "change_ring_RDF",
     ]
     private static let listActions = ["length", "sort", "sum", "set"]
     private static let plotActions = ["save_png", "save_svg", "show"]
