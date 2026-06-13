@@ -516,6 +516,44 @@ struct ShellModelInputTests {
         #expect(model.tapeReferences.entries.keys.sorted() == Array(6...25))
     }
 
+    @Test("subs formula bar model rewrites friendly IR with a bindings edit")
+    func subsFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "subs x^2 + y"
+        guard case let .subs(formula0) = model.formulaIR else {
+            Issue.record("expected subs formula")
+            return
+        }
+        #expect(formula0.expression == "x^2 + y")
+        #expect(formula0.bindings.isEmpty)
+
+        var formula = formula0
+        formula.bindings = "x=3"
+        model.updateFormula(.subs(formula))
+        #expect(model.draft == "subs x^2 + y, x=3")
+        #expect(model.subsFormula?.bindings == "x=3")
+        #expect(model.draftPreview == .generated("(x^2 + y).subs(x=3)"))
+    }
+
+    @Test("numeric formula bar model rewrites friendly IR with a digits edit")
+    func numericFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "numeric pi"
+        guard case let .numeric(formula0) = model.formulaIR else {
+            Issue.record("expected numeric formula")
+            return
+        }
+        #expect(formula0.expression == "pi")
+        #expect(formula0.digits.isEmpty)
+
+        var formula = formula0
+        formula.digits = "50"
+        model.updateFormula(.numeric(formula))
+        #expect(model.draft == "numeric pi, 50")
+        #expect(model.numericFormula?.digits == "50")
+        #expect(model.draftPreview == .generated("N(pi, digits=50)"))
+    }
+
     @Test("multiline drafts preview as raw Sage")
     func multilinePreviewIsRaw() {
         let model = ShellModel()

@@ -8,17 +8,22 @@ struct FormulaTokenField: View {
     /// upper field of a compact axis group) can name itself for VoiceOver while
     /// showing no visible label text.
     var accessibilityTitle: String?
+    /// The value field's growth ceiling. Defaults to the compact 150pt token;
+    /// longer payloads (e.g. a `subs` binding list) widen it.
+    var maxWidth: CGFloat
 
     init(
         title: String,
         prompt: String,
         text: Binding<String>,
-        accessibilityTitle: String? = nil
+        accessibilityTitle: String? = nil,
+        maxWidth: CGFloat = 150
     ) {
         self.title = title
         self.prompt = prompt
         self._text = text
         self.accessibilityTitle = accessibilityTitle
+        self.maxWidth = maxWidth
     }
 
     var body: some View {
@@ -31,7 +36,7 @@ struct FormulaTokenField: View {
             TextField(prompt, text: $text)
                 .font(Theme.Fonts.formulaTokenValue)
                 .textFieldStyle(.plain)
-                .frame(minWidth: 34, idealWidth: text.isEmpty ? 44 : 72, maxWidth: 150)
+                .frame(minWidth: 34, idealWidth: text.isEmpty ? 44 : 72, maxWidth: maxWidth)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)

@@ -537,6 +537,21 @@ final class ShellModel {
         return ir
     }
 
+    var vectorCalculusFormula: VectorCalculusFormulaIR? {
+        guard case let .vectorCalculus(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var subsFormula: SubsFormulaIR? {
+        guard case let .subs(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var numericFormula: NumericFormulaIR? {
+        guard case let .numeric(ir) = formulaIR else { return nil }
+        return ir
+    }
+
     func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }

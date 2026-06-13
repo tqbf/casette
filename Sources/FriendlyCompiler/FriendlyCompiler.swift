@@ -84,6 +84,12 @@ public enum FriendlyCompiler {
         case .transpose:    return matrixMethod(rest, method: "transpose")
         case .rank:         return matrixMethod(rest, method: "rank")
         case .eigenvectors: return matrixMethod(rest, method: "eigenvectors_right")
+        case .gradient:     return gradient(rest)
+        case .hessian:      return hessian(rest)
+        case .jacobian:     return jacobian(rest)
+        case .subs:         return subs(rest)
+        case .numeric:      return numeric(rest)
+        case .latex:        return latexForm(rest)
         }
     }
 
@@ -96,6 +102,7 @@ public enum FriendlyCompiler {
         case sum, product
         case matrix, vector, eigenvalues, rref
         case det, inverse, transpose, rank, eigenvectors
+        case gradient, hessian, jacobian, subs, numeric, latex
 
         /// The phrase(s) that introduce this command. Multi-word first so the
         /// matcher prefers "double integral" over "integral".
@@ -124,6 +131,12 @@ public enum FriendlyCompiler {
             case .transpose: return ["transpose"]
             case .rank: return ["rank"]
             case .eigenvectors: return ["eigenvectors", "eigenvector"]
+            case .gradient: return ["gradient", "grad"]
+            case .hessian: return ["hessian"]
+            case .jacobian: return ["jacobian"]
+            case .subs: return ["subs", "substitute"]
+            case .numeric: return ["numeric", "approx", "decimal"]
+            case .latex: return ["latex"]
             }
         }
 
@@ -154,6 +167,12 @@ public enum FriendlyCompiler {
             case .transpose: return "Try: transpose [1,2; 3,4]"
             case .rank: return "Try: rank [1,2; 3,4]"
             case .eigenvectors: return "Try: eigenvectors [1,2; 3,4]"
+            case .gradient: return "Try: gradient x^2 + y^2  or  gradient x^2 + y^2, [x,y]"
+            case .hessian: return "Try: hessian x^2 + y^2"
+            case .jacobian: return "Try: jacobian [x^2+y, sin(x*y)], [x,y]"
+            case .subs: return "Try: subs x^2 + y, x=3"
+            case .numeric: return "Try: numeric pi  or  numeric pi, 50"
+            case .latex: return "Try: latex integral(sin(x), x)"
             }
         }
     }
@@ -757,6 +776,216 @@ public enum FriendlyCompiler {
         return .success(
             generatedSage: "vector(\(body))",
             requiredVariables: Variables.freeVariables(in: body))
+    }
+
+    // MARK: - Form: gradient
+
+    /// `gradient EXPR` → `(EXPR).gradient()`; `gradient EXPR, [x,y]` →
+    /// `(EXPR).gradient([x, y])`. A symbolic expression's `.gradient()`
+    /// differentiates over all free variables with no args; an explicit
+    /// bracketed var list orders and restricts that. The list entries are each
+    /// validated as plausible variables.
+    private static func gradient(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`gradient` needs an expression.",
+                suggestion: "Try: gradient x^2 + y^2  or  gradient x^2 + y^2, [x,y]"
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            // No var list: gradient over all free variables.
+            return .success(
+                generatedSage: "(\(expr)).gradient()",
+                requiredVariables: Variables.freeVariables(in: expr))
+        }
+        // A single bracketed var-list clause follows the expression.
+        let listText = rest.joined(separator: ", ").trimmedShim
+        guard let vars = bracketedVariableList(listText) else {
+            return .error(CompileError(
+                message: "`gradient` variables must be a bracketed list like `[x, y]`.",
+                suggestion: "Try: gradient x^2 + y^2, [x,y]"
+            ))
+        }
+        let req = orderedUnique(vars + Variables.freeVariables(in: expr, bound: vars))
+        return .success(
+            generatedSage: "(\(expr)).gradient([\(vars.joined(separator: ", "))])",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: hessian
+
+    /// `hessian EXPR` → `(EXPR).hessian()`. Sage's symbolic `.hessian()` takes
+    /// no reliable argument list, so ONLY the bare form is accepted; a second
+    /// clause is a structured error rather than an invented lowering.
+    private static func hessian(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`hessian` needs an expression.",
+                suggestion: "Try: hessian x^2 + y^2"
+            ))
+        }
+        guard parts.count == 1 else {
+            return .error(CompileError(
+                message: "`hessian` takes just an expression.",
+                suggestion: "Try: hessian x^2 + y^2"
+            ))
+        }
+        return .success(
+            generatedSage: "(\(expr)).hessian()",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: jacobian
+
+    /// `jacobian [F1, F2], [x, y]` → `jacobian([F1, F2], [x, y])` (Sage's
+    /// global `jacobian(functions, vars)`). Both clauses are required and
+    /// bracketed; the var-list entries are validated.
+    private static func jacobian(_ payload: String) -> CompileResult {
+        let example = "Try: jacobian [x^2+y, sin(x*y)], [x,y]"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let functionsText = parts.first?.trimmedShim, !functionsText.isEmpty else {
+            return .error(CompileError(
+                message: "`jacobian` needs a bracketed list of functions.",
+                suggestion: example
+            ))
+        }
+        guard functionsText.hasPrefix("["), functionsText.hasSuffix("]"),
+              singleOuterBracketBody(functionsText) != nil else {
+            return .error(CompileError(
+                message: "`jacobian` functions must be a bracketed list like `[x^2+y, sin(x*y)]`.",
+                suggestion: example
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            return .error(CompileError(
+                message: "`jacobian` needs a bracketed variable list.",
+                suggestion: example
+            ))
+        }
+        let listText = rest.joined(separator: ", ").trimmedShim
+        guard let vars = bracketedVariableList(listText) else {
+            return .error(CompileError(
+                message: "`jacobian` variables must be a bracketed list like `[x, y]`.",
+                suggestion: example
+            ))
+        }
+        let req = orderedUnique(
+            vars + Variables.freeVariables(in: functionsText, bound: vars))
+        return .success(
+            generatedSage: "jacobian(\(functionsText), [\(vars.joined(separator: ", "))])",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: subs
+
+    /// `subs EXPR, V1=VAL1, V2=VAL2, ...` → `(EXPR).subs(V1=VAL1, V2=VAL2)`.
+    /// Each binding clause splits on its FIRST top-level `=`; the name must be
+    /// a plausible variable and the value non-empty (and not a range).
+    private static func subs(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`subs` needs an expression.",
+                suggestion: "Try: subs x^2 + y, x=3"
+            ))
+        }
+        let bindingClauses = Array(parts.dropFirst())
+        guard !bindingClauses.isEmpty else {
+            return .error(CompileError(
+                message: "`subs` needs at least one binding `var=value`.",
+                suggestion: "Try: subs x^2 + y, x=3"
+            ))
+        }
+        var bindings: [(name: String, value: String)] = []
+        for clause in bindingClauses {
+            let c = clause.trimmedShim
+            guard let eqIdx = c.firstIndex(of: "="), !c.contains("..") else {
+                return .error(CompileError(
+                    message: "`subs` binding `\(c)` must be `var=value`.",
+                    suggestion: "Try: subs x^2 + y, x=3"
+                ))
+            }
+            let name = String(c[c.startIndex..<eqIdx]).trimmedShim
+            let value = String(c[c.index(after: eqIdx)...]).trimmedShim
+            guard Variables.isPlausibleVariable(name), !value.isEmpty else {
+                return .error(CompileError(
+                    message: "`subs` binding `\(c)` must be `var=value`.",
+                    suggestion: "Try: subs x^2 + y, x=3"
+                ))
+            }
+            bindings.append((name, value))
+        }
+        let bindingSage = bindings.map { "\($0.name)=\($0.value)" }.joined(separator: ", ")
+        let bindingVars = bindings.map(\.name)
+        let bindingValues = bindings.map(\.value).joined(separator: " ")
+        let req = orderedUnique(
+            bindingVars + Variables.freeVariables(in: "\(expr) \(bindingValues)"))
+        return .success(
+            generatedSage: "(\(expr)).subs(\(bindingSage))",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: numeric
+
+    /// `numeric EXPR` → `N(EXPR)`; `numeric EXPR, DIGITS` →
+    /// `N(EXPR, digits=DIGITS)` (the last clause must be all digits).
+    private static func numeric(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`numeric` needs an expression.",
+                suggestion: "Try: numeric pi  or  numeric pi, 50"
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            return .success(
+                generatedSage: "N(\(expr))",
+                requiredVariables: Variables.freeVariables(in: expr))
+        }
+        guard rest.count == 1 else {
+            return .error(CompileError(
+                message: "`numeric` takes at most a digit count after the expression.",
+                suggestion: "Try: numeric pi, 50"
+            ))
+        }
+        let digits = rest[0].trimmedShim
+        guard !digits.isEmpty, digits.allSatisfy({ $0.isNumber }) else {
+            return .error(CompileError(
+                message: "`numeric` digits must be a whole number (got `\(digits)`).",
+                suggestion: "Try: numeric pi, 50"
+            ))
+        }
+        return .success(
+            generatedSage: "N(\(expr), digits=\(digits))",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: latex
+
+    /// `latex EXPR` → `latex(EXPR)`.
+    private static func latexForm(_ payload: String) -> CompileResult {
+        let expr = payload.trimmedShim
+        return .success(
+            generatedSage: "latex(\(expr))",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    /// Parse a bracketed variable list `[x, y]`, validating each entry as a
+    /// plausible variable. Returns the trimmed names, or nil if the text isn't
+    /// a single bracketed list or any entry is not a valid variable.
+    private static func bracketedVariableList(_ text: String) -> [String]? {
+        let body = text.trimmedShim
+        guard body.hasPrefix("["), body.hasSuffix("]"),
+              let inside = singleOuterBracketBody(body) else { return nil }
+        let entries = Scanner.splitTopLevelCommas(inside).map { $0.trimmedShim }
+        guard !entries.isEmpty, entries.allSatisfy({ Variables.isPlausibleVariable($0) })
+        else { return nil }
+        return entries
     }
 
     private static func matlabMatrixShorthand(_ input: String) -> CompileResult? {

@@ -33,6 +33,12 @@ struct FormulaBarView: View {
             ParametricPlotFormulaBar(model: model, formula: ir)
         case let .matrixOp(ir):
             MatrixFormulaBar(model: model, formula: ir)
+        case let .vectorCalculus(ir):
+            VectorCalculusFormulaBar(model: model, formula: ir)
+        case let .subs(ir):
+            SubsFormulaBar(model: model, formula: ir)
+        case let .numeric(ir):
+            NumericFormulaBar(model: model, formula: ir)
         }
     }
 }

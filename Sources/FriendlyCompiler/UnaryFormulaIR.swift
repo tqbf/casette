@@ -1,7 +1,8 @@
 import Foundation
 
 /// The small user-editable shape behind Casette's single-expression transform
-/// bars: `expand`, `factor`, and `simplify`. Each wraps one expression payload.
+/// bars: `expand`, `factor`, `simplify`, and `latex`. Each wraps one
+/// expression payload.
 ///
 /// Like the other formula IRs, this renders back to friendly input, not Sage.
 /// App-specific source forms such as `#14` tape references remain intact here;
@@ -13,6 +14,7 @@ public struct UnaryFormulaIR: Equatable, Sendable {
         case expand
         case factor
         case simplify
+        case latex
 
         /// The canonical friendly command word (also the rendered prefix).
         public var command: String {
@@ -20,6 +22,7 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .expand: return "expand"
             case .factor: return "factor"
             case .simplify: return "simplify"
+            case .latex: return "latex"
             }
         }
 
@@ -29,6 +32,7 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .expand: return "EXPAND"
             case .factor: return "FACTOR"
             case .simplify: return "SIMPLIFY"
+            case .latex: return "LATEX"
             }
         }
 
@@ -37,6 +41,7 @@ public struct UnaryFormulaIR: Equatable, Sendable {
             case .expand: self = .expand
             case .factor: self = .factor
             case .simplify: self = .simplify
+            case .latex: self = .latex
             default: return nil
             }
         }

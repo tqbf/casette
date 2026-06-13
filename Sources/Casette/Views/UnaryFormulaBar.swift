@@ -28,6 +28,7 @@ struct UnaryFormulaBar: View {
         case .expand: return "(x+1)^3"
         case .factor: return "x^2 - 1"
         case .simplify: return "sin(x)^2 + cos(x)^2"
+        case .latex: return "integral(sin(x), x)"
         }
     }
 
