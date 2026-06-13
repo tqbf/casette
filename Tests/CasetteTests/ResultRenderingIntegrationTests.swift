@@ -30,6 +30,27 @@ struct ResultRenderingIntegrationTests {
             Issue.record("matrix envelope carried no latex")
         }
 
+        let largeMatrix = await controller.evaluate("matrix(ZZ, 6, 6, range(36))")
+        #expect(largeMatrix.result?.kind == "matrix")
+        if let latex = largeMatrix.result?.latex {
+            #expect(latex.contains("\\cdots"))
+            #expect(latex.contains("\\vdots"))
+            #expect(latex.contains("35"))
+            #expect(MathContent.choose(latex: latex) == .math(latex: latex))
+        } else {
+            Issue.record("large matrix envelope carried no latex")
+        }
+
+        let matrixRow = await controller.evaluate("matrix(QQ, 7, 7, range(49))[0]")
+        if let latex = matrixRow.result?.latex {
+            #expect(latex.contains("\\begin{array}"))
+            #expect(latex.contains("\\cdots"))
+            #expect(!latex.contains(#"\left(0,\,"#))
+            #expect(MathContent.choose(latex: latex) == .math(latex: latex))
+        } else {
+            Issue.record("matrix row envelope carried no latex")
+        }
+
         // Symbolic with braced scripts (the LaTeXSwiftUI killer): x^{8}, \, …
         _ = await controller.evaluate("x = var('x')")
         let poly = await controller.evaluate("expand((x+1)^8)")

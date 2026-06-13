@@ -515,6 +515,16 @@ the original `plain_len`/`repr_len` and the caps. Error messages and tracebacks
 are capped the same way. Proven against `list(range(10^6))` (~7.9 MB) and
 `factorial(10^5)` (~456 KB).
 
+Matrix LaTeX has a display-specific abbreviation before the hard cap: matrices
+with more than five rows or more than five columns show the first three
+rows/columns plus the final row/column. Omitted interior columns are marked with
+`\cdots`; omitted interior rows are marked with `\vdots`. The underlying `plain`
+and `repr` values remain Sage's full text subject only to the normal cap.
+Standalone Sage vectors render as one-row array matrices rather than Sage's
+tuple form (`\left(0,\,1,\,...\right)`), because that tuple form can assert
+inside SwiftMath during layout. Vectors with more than five entries use the
+same first-three / final-entry `\cdots` abbreviation as wide matrices.
+
 ---
 
 ## Lifecycle states (parent-side; V0.2)

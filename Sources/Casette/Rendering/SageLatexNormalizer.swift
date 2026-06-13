@@ -28,6 +28,7 @@ enum SageLatexNormalizer {
     /// instead of crashing.
     static func isUnsafeForSwiftMathLayout(_ normalizedLatex: String) -> Bool {
         hasNestedLeftRightGroup(normalizedLatex)
+            || hasFlatCommaDelimitedLeftRightGroup(normalizedLatex)
     }
 
     /// Detect a `\left` before its containing `\right` has closed. Sequential
@@ -55,6 +56,24 @@ enum SageLatexNormalizer {
         }
 
         return false
+    }
+
+    /// Sage's default LaTeX for standalone vectors is a flat tuple, e.g.
+    /// `\left(0,\,1,\,2\right)`. SwiftMath can parse this but has asserted
+    /// while measuring it, so legacy persisted rows with this shape fall back
+    /// to plain text. New worker envelopes render vectors as array matrices.
+    static func hasFlatCommaDelimitedLeftRightGroup(_ latex: String) -> Bool {
+        guard latex.contains(#"\left("#),
+              latex.contains(#",\,"#),
+              latex.contains(#"\right)"#)
+        else { return false }
+
+        guard let re = try? NSRegularExpression(
+            pattern: #"^\\left\((?:(?!\\left|\\right).)*,\\,(?:(?!\\left|\\right).)*\\right\)$"#,
+            options: [.dotMatchesLineSeparators]
+        ) else { return false }
+        let range = NSRange(latex.startIndex..<latex.endIndex, in: latex)
+        return re.firstMatch(in: latex, range: range) != nil
     }
 
     private static func collapseWhitespace(_ latex: String) -> String {

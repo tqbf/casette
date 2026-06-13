@@ -362,7 +362,8 @@ class _CasetteSVDResult:
         labels = ("U", "S", "V")
         pieces = []
         for label, matrix in zip(labels, self.factors):
-            pieces.append("%s = %s" % (label, latex(matrix)))  # noqa: F405
+            pieces.append("%s = %s" % (
+                label, _matrix_latex(matrix) or str(latex(matrix))))  # noqa: F405
         return "\\qquad ".join(pieces)
 
 
@@ -759,13 +760,97 @@ def _safe_latex(value):
     We cap LaTeX too: the LaTeX of `list(range(10^6))` is megabytes and useless
     to a renderer."""
     try:
-        s = _vector_sequence_latex(value)
+        s = _matrix_latex(value)
+        if s is None:
+            s = _vector_latex(value)
+        if s is None:
+            s = _vector_sequence_latex(value)
         if s is None:
             s = str(latex(value))  # noqa: F405 (latex from sage.all)
     except Exception:
         return None
     capped, _ = _cap(s, _MAX_LATEX)
     return capped
+
+
+def _matrix_latex(value):
+    """Custom LaTeX for large matrices.
+
+    Full Sage matrix LaTeX is perfect for small matrices, but wide/tall
+    transformation results can dominate the tape. When either dimension is
+    greater than five, show the first three rows/columns and the final
+    row/column, with ellipses marking omitted interior rows/columns.
+    """
+    if "sage.matrix" not in (type(value).__module__ or ""):
+        return None
+
+    try:
+        nrows = value.nrows()
+        ncols = value.ncols()
+    except Exception:
+        return None
+
+    if nrows <= 5 and ncols <= 5:
+        return None
+
+    row_keys = _matrix_preview_keys(nrows)
+    col_keys = _matrix_preview_keys(ncols)
+    column_spec = "r" * len(col_keys)
+    rows = []
+    for row_key in row_keys:
+        cells = []
+        for col_key in col_keys:
+            if row_key is None:
+                cells.append("\\vdots")
+            elif col_key is None:
+                cells.append("\\cdots")
+            else:
+                cells.append(str(latex(value[row_key, col_key])))  # noqa: F405
+        rows.append(" & ".join(cells))
+
+    return (
+        "\\left(\\begin{array}{%s}\n%s\n\\end{array}\\right)"
+        % (column_spec, " \\\\\n".join(rows))
+    )
+
+
+def _matrix_preview_keys(count):
+    if count <= 5:
+        return list(range(count))
+    return [0, 1, 2, None, count - 1]
+
+
+def _vector_latex(value):
+    """Custom LaTeX for standalone Sage vectors.
+
+    Sage's default tuple-style vector LaTeX (`\left(0,\,1,\,...\right)`) can
+    assert inside SwiftMath while measuring. Render vectors as a single-row
+    matrix instead; when long, use the same first-three / last-entry preview
+    policy as wide matrices.
+    """
+    if not _is_vector_like(value):
+        return None
+
+    try:
+        entries = list(value)
+    except Exception:
+        return None
+
+    if not entries:
+        return None
+
+    keys = _matrix_preview_keys(len(entries))
+    cells = []
+    for key in keys:
+        if key is None:
+            cells.append("\\cdots")
+        else:
+            cells.append(str(latex(entries[key])))  # noqa: F405
+
+    return (
+        "\\left(\\begin{array}{%s}\n%s\n\\end{array}\\right)"
+        % ("r" * len(cells), " & ".join(cells))
+    )
 
 
 def _vector_sequence_latex(value):
