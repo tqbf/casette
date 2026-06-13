@@ -4,10 +4,22 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**634/634**, 97 suites), `make check`,
+Current gates are green: `swift test` (**637/637**, 97 suites), `make check`,
 `make build`, and the worker envelope harness (**97/97**) passed for the
 latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest crash fix:** SwiftMath parser success is no longer treated as enough
+to render LaTeX. A crash report showed `MTTypesetter.getInterElementSpace`
+asserting while SwiftUI measured an `MTMathUILabel`; the stack passed through
+nested `makeLeftRight` calls, matching nested `\left...\right` delimiter groups.
+Casette now detects nested delimiter groups after Sage normalization and falls
+back to the worker's plain text before SwiftMath can measure them. Sequential
+delimiter groups and normalized Sage matrices still render as math. Focused
+rendering tests cover tuple-list basis LaTeX, nested braces, sequential groups,
+and normalized matrices. Details:
+[`problems/027-swiftmath-can-parse-nested-left-right-groups-then-assert.md`](problems/027-swiftmath-can-parse-nested-left-right-groups-then-assert.md).
+Validation: `make check`, `swift test` **637/637**, and `make build` green.
 
 **Latest help-system work:** Casette now ships a native Help window for the
 Friendly Compiler mini-language. The Help menu has **Friendly Compiler
