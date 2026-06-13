@@ -1,3 +1,5 @@
+import AppKit
+import FriendlyCompiler
 import SwiftUI
 
 /// The expanding input field: single-line by default, growing with its
@@ -69,6 +71,16 @@ struct InputEditor: View {
                 // — the NSTextView eats Esc as `cancelOperation:`. The
                 // working Esc route is `EscapeInterceptor` in InputPaneView.
                 .onKeyPress(characters: Self.pickerDigits, phases: [.down], action: handlePickerDigit)
+                // Tab → enter the formula lane (Numbers-style), but ONLY when a
+                // lane is actually showing and no picker is up. The lane's
+                // tokens are NSTextFields in this same window's key-view loop,
+                // laid out after the editor, so advancing to the next key view
+                // lands on the first token; native Tab/Shift-Tab then walks the
+                // tokens. This is the same conservative routing as the handlers
+                // above: no new event monitor, and we return `.ignored` whenever
+                // there's no lane, so Tab keeps its default text behavior (and
+                // the picker's Return/digit/Esc routing is untouched).
+                .onKeyPress(.tab, phases: [.down], action: handleTab)
                 .onKeyPress(.upArrow) { historyStep(model.recallPreviousInput) }
                 .onKeyPress(.downArrow) { historyStep(model.recallNextInput) }
                 .accessibilityLabel("Expression")
@@ -108,6 +120,25 @@ struct InputEditor: View {
             model.resolveAmbiguity(at: digit - 1)
         }
         return .handled
+    }
+
+    /// Tab moves keyboard focus into the formula lane when one is showing.
+    /// When `shouldEnterLane` is false (no lane, or a picker pending) Tab is
+    /// `.ignored` so the text view's default tab behavior is preserved.
+    private func handleTab(_ press: KeyPress) -> KeyPress.Result {
+        guard Self.shouldEnterLane(formulaIR: model.formulaIR, pendingAmbiguity: model.pendingAmbiguity)
+        else { return .ignored }
+        // Shift-Tab keeps walking the loop backwards natively once focus is in
+        // the lane; from the editor a plain Tab is the only entry gesture.
+        if press.modifiers.contains(.shift) { return .ignored }
+        NSApp.keyWindow?.selectNextKeyView(nil)
+        return .handled
+    }
+
+    /// The model-level guard for "Tab should enter the lane": a lane is showing
+    /// and no ambiguity picker is pending. Pure so it is unit-testable.
+    static func shouldEnterLane(formulaIR: FormulaIR?, pendingAmbiguity: PendingAmbiguity?) -> Bool {
+        formulaIR != nil && pendingAmbiguity == nil
     }
 
     private func historyStep(_ step: () -> Bool) -> KeyPress.Result {

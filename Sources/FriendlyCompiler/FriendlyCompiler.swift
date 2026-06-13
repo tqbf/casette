@@ -41,6 +41,26 @@ public enum FriendlyCompiler {
         // The remainder after the command word(s).
         let rest = String(input.dropFirst(cmd.matchedPrefix.count)).trimmedShim
 
+        // `var = 3` is an assignment, not the `var` command: the friendly form
+        // declares symbolic names (`var x y`), so a leading `=` means the user is
+        // assigning to a variable literally named `var`. Fall through to the
+        // assignment echo so it stays byte-identical to the pre-`var`-keyword
+        // behavior (`var = 3` → `var = 3\nvar`).
+        if cmd.keyword == .varDeclaration, rest.first == "=" {
+            if let assignment = simpleAssignmentEcho(input) {
+                return assignment
+            }
+            return .bypass(rawSage: input)
+        }
+
+        // `forget` is a no-argument command (clears all assumptions). The exact
+        // bare word yields an empty `rest`, which would otherwise error below; a
+        // bare/`all`/`assumptions` payload lowers to `forget()`. This must run
+        // BEFORE the empty-rest error path.
+        if cmd.keyword == .forget {
+            return forgetForm(rest)
+        }
+
         // A bare command word with no argument: nothing to compile. Treat as raw
         // (the user may have a variable named `factor`, however unlikely) — but
         // more usefully, a structured error guides them.
@@ -71,9 +91,35 @@ public enum FriendlyCompiler {
         case .limit:        return limitForm(rest)
         case .taylor:       return taylor(rest)
         case .plot:         return plot(rest)
+        case .implicitPlot: return implicitPlot(rest)
+        case .parametricPlot: return parametricPlot(rest)
+        case .sum:          return seriesRange(rest, sage: "sum", command: "sum")
+        case .product:      return seriesRange(rest, sage: "product", command: "product")
         case .matrix:       return matrixForm(rest)
+        case .vector:       return vectorForm(rest)
         case .eigenvalues:  return matrixMethod(rest, method: "eigenvalues")
         case .rref:         return matrixMethod(rest, method: "rref")
+        case .det:          return matrixMethod(rest, method: "det")
+        case .inverse:      return matrixMethod(rest, method: "inverse")
+        case .transpose:    return matrixMethod(rest, method: "transpose")
+        case .rank:         return matrixMethod(rest, method: "rank")
+        case .eigenvectors: return matrixMethod(rest, method: "eigenvectors_right")
+        case .gradient:     return gradient(rest)
+        case .hessian:      return hessian(rest)
+        case .jacobian:     return jacobian(rest)
+        case .subs:         return subs(rest)
+        case .numeric:      return numeric(rest)
+        case .latex:        return latexForm(rest)
+        case .varDeclaration: return varForm(rest)
+        case .assume:       return assumeForm(rest)
+        case .forget:       return forgetForm(rest)
+        case .choose:       return chooseForm(rest)
+        case .gcd:          return gcdLcmForm(rest, fn: "gcd")
+        case .lcm:          return gcdLcmForm(rest, fn: "lcm")
+        case .factorial:    return wrapCall("factorial", rest)
+        case .isPrime:      return wrapCall("is_prime", rest)
+        case .factorInteger: return wrapCall("factor", rest)
+        case .mean:         return meanForm(rest)
         }
     }
 
@@ -82,7 +128,13 @@ public enum FriendlyCompiler {
     enum Keyword: CaseIterable {
         case factor, expand, simplify, solve, derivative
         case integral, doubleIntegral, limit, taylor, plot
-        case matrix, eigenvalues, rref
+        case implicitPlot, parametricPlot
+        case sum, product
+        case matrix, vector, eigenvalues, rref
+        case det, inverse, transpose, rank, eigenvectors
+        case gradient, hessian, jacobian, subs, numeric, latex
+        case varDeclaration, assume, forget, choose, gcd, lcm
+        case factorial, isPrime, factorInteger, mean
 
         /// The phrase(s) that introduce this command. Multi-word first so the
         /// matcher prefers "double integral" over "integral".
@@ -98,9 +150,35 @@ public enum FriendlyCompiler {
             case .limit: return ["limit"]
             case .taylor: return ["taylor"]
             case .plot: return ["plot"]
+            case .implicitPlot: return ["implicit_plot", "implicit plot"]
+            case .parametricPlot: return ["parametric_plot", "parametric plot"]
+            case .sum: return ["sum"]
+            case .product: return ["product"]
             case .matrix: return ["matrix"]
+            case .vector: return ["vector"]
             case .eigenvalues: return ["eigenvalues", "eigenvalue"]
             case .rref: return ["rref"]
+            case .det: return ["det", "determinant"]
+            case .inverse: return ["inverse"]
+            case .transpose: return ["transpose"]
+            case .rank: return ["rank"]
+            case .eigenvectors: return ["eigenvectors", "eigenvector"]
+            case .gradient: return ["gradient", "grad"]
+            case .hessian: return ["hessian"]
+            case .jacobian: return ["jacobian"]
+            case .subs: return ["subs", "substitute"]
+            case .numeric: return ["numeric", "approx", "decimal"]
+            case .latex: return ["latex"]
+            case .varDeclaration: return ["var"]
+            case .assume: return ["assume"]
+            case .forget: return ["forget"]
+            case .choose: return ["choose"]
+            case .gcd: return ["gcd"]
+            case .lcm: return ["lcm"]
+            case .factorial: return ["factorial"]
+            case .isPrime: return ["is_prime"]
+            case .factorInteger: return ["factor_integer", "prime_factorization"]
+            case .mean: return ["mean"]
             }
         }
 
@@ -118,9 +196,35 @@ public enum FriendlyCompiler {
             case .limit: return "Try: limit sin(x)/x, x->0"
             case .taylor: return "Try: taylor sin(x), x=0, order=7"
             case .plot: return "Try: plot sin(x), x=-pi..pi"
+            case .implicitPlot: return "Try: implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2"
+            case .parametricPlot: return "Try: parametric_plot (cos(t), sin(t)), t=0..2*pi"
+            case .sum: return "Try: sum k^2, k=1..n"
+            case .product: return "Try: product 1 + 1/k, k=1..n"
             case .matrix: return "Try: matrix [1,2; 3,4]"
+            case .vector: return "Try: vector [1,2,3]"
             case .eigenvalues: return "Try: eigenvalues [1,2; 3,4]"
             case .rref: return "Try: rref [1,2; 3,4]"
+            case .det: return "Try: det [1,2; 3,4]"
+            case .inverse: return "Try: inverse [1,2; 3,4]"
+            case .transpose: return "Try: transpose [1,2; 3,4]"
+            case .rank: return "Try: rank [1,2; 3,4]"
+            case .eigenvectors: return "Try: eigenvectors [1,2; 3,4]"
+            case .gradient: return "Try: gradient x^2 + y^2  or  gradient x^2 + y^2, [x,y]"
+            case .hessian: return "Try: hessian x^2 + y^2"
+            case .jacobian: return "Try: jacobian [x^2+y, sin(x*y)], [x,y]"
+            case .subs: return "Try: subs x^2 + y, x=3"
+            case .numeric: return "Try: numeric pi  or  numeric pi, 50"
+            case .latex: return "Try: latex integral(sin(x), x)"
+            case .varDeclaration: return "Try: var a b c"
+            case .assume: return "Try: assume x > 0  or  assume x real"
+            case .forget: return "Try: forget"
+            case .choose: return "Try: choose 10, 3"
+            case .gcd: return "Try: gcd 12, 18  or  gcd [12, 18, 24]"
+            case .lcm: return "Try: lcm 12, 18  or  lcm [12, 18, 24]"
+            case .factorial: return "Try: factorial 5"
+            case .isPrime: return "Try: is_prime 104729"
+            case .factorInteger: return "Try: factor_integer 3600"
+            case .mean: return "Try: mean [1, 2, 3]"
             }
         }
     }
@@ -241,14 +345,38 @@ public enum FriendlyCompiler {
     // MARK: - Form: derivative
 
     private static func derivative(_ payload: String) -> CompileResult {
+        // Peel the trailing `wrt v` clause first (as before), so the comma split
+        // below sees only the body (+ an optional trailing order).
         var body = payload
         var wrtVar: String?
         if let range = trailingClause(in: body, keyword: "wrt") {
             wrtVar = body[range.valueRange].trimmedShim
             body = String(body[body.startIndex..<range.clauseStart]).trimmedShim
         }
+
+        // Optional trailing order, comma form ONLY: split on top-level commas and
+        // if the LAST part is all digits, peel it off as the order. The remainder
+        // re-joins as the differentiation body and flows through the UNCHANGED
+        // wrt/inference logic — so a payload with no trailing digit clause is
+        // byte-identical to before (the single-part split returns the body intact).
+        var order: String?
+        let parts = Scanner.splitTopLevelCommas(body)
+        if parts.count >= 2,
+           let last = parts.last?.trimmedShim,
+           !last.isEmpty, last.allSatisfy({ $0.isNumber }) {
+            order = last
+            body = parts.dropLast().joined(separator: ",").trimmedShim
+        }
+
         let expr = body.trimmedShim
         let vars = Variables.freeVariables(in: expr)
+
+        // Build the Sage call for a chosen variable, with the order appended when
+        // present: derivative(expr, v) or derivative(expr, v, N).
+        func call(_ v: String) -> String {
+            if let order { return "derivative(\(expr), \(v), \(order))" }
+            return "derivative(\(expr), \(v))"
+        }
 
         if let v = wrtVar, !v.isEmpty {
             guard Variables.isPlausibleVariable(v) else {
@@ -259,7 +387,7 @@ public enum FriendlyCompiler {
             }
             var req = vars
             if !req.contains(v) { req.insert(v, at: 0) }
-            return .success(generatedSage: "derivative(\(expr), \(v))", requiredVariables: req)
+            return .success(generatedSage: call(v), requiredVariables: req)
         }
 
         switch vars.count {
@@ -269,9 +397,9 @@ public enum FriendlyCompiler {
                 suggestion: "Add one: derivative \(expr) wrt x"
             ))
         case 1:
-            return .success(generatedSage: "derivative(\(expr), \(vars[0]))", requiredVariables: vars)
+            return .success(generatedSage: call(vars[0]), requiredVariables: vars)
         default:
-            let candidates = vars.map { "derivative(\(expr), \($0))" }
+            let candidates = vars.map { call($0) }
             return .ambiguous(candidates: candidates)
         }
     }
@@ -374,7 +502,7 @@ public enum FriendlyCompiler {
     // MARK: - Form: limit
 
     private static func limitForm(_ payload: String) -> CompileResult {
-        // `limit EXPR, VAR->VAL`. Split first top-level comma: expr, approach.
+        // `limit EXPR, VAR->VAL` with an optional third clause `left`/`right`.
         let parts = Scanner.splitTopLevelCommas(payload)
         guard parts.count >= 2 else {
             return .error(CompileError(
@@ -383,7 +511,26 @@ public enum FriendlyCompiler {
             ))
         }
         let expr = parts[0].trimmedShim
-        let approach = parts[1...].joined(separator: ", ").trimmedShim
+
+        // An optional trailing `left`/`right` clause names the one-sided direction.
+        // It is recognized only as a standalone third part (not a fragment of the
+        // approach), so the two-clause form is unchanged.
+        var dir: String?
+        var approachParts = Array(parts[1...])
+        if approachParts.count >= 2 {
+            let tail = approachParts[approachParts.count - 1].trimmedShim.lowercased()
+            switch tail {
+            case "left": dir = "-"
+            case "right": dir = "+"
+            default:
+                return .error(CompileError(
+                    message: "`limit` direction must be `left` or `right`.",
+                    suggestion: "Try: limit sin(x)/x, x->0, right"
+                ))
+            }
+            approachParts.removeLast()
+        }
+        let approach = approachParts.joined(separator: ", ").trimmedShim
         // Split on `->`.
         guard let arrowRange = approach.range(of: "->") else {
             return .error(CompileError(
@@ -405,7 +552,12 @@ public enum FriendlyCompiler {
                 suggestion: "Try: limit sin(x)/x, x->0"
             ))
         }
-        let sage = "limit(\(expr), \(v)=\(point))"
+        let sage: String
+        if let dir {
+            sage = "limit(\(expr), \(v)=\(point), dir='\(dir)')"
+        } else {
+            sage = "limit(\(expr), \(v)=\(point))"
+        }
         let req = orderedUnique([v] + Variables.freeVariables(in: "\(expr) \(point)", bound: [v]))
         return .success(generatedSage: sage, requiredVariables: req)
     }
@@ -460,6 +612,43 @@ public enum FriendlyCompiler {
         return .success(generatedSage: sage, requiredVariables: req)
     }
 
+    // MARK: - Form: sum / product
+
+    /// `sum EXPR, VAR=LO..HI` → `sum(EXPR, VAR, LO, HI)`; same shape for product.
+    /// Mirrors the definite-integral branch: split on top-level commas, first part
+    /// is the summand/factor, then exactly one range clause. Lowercase symbolic
+    /// `sum`/`product` are the correct Sage forms (sum(k^2, k, 1, n) → ...).
+    private static func seriesRange(_ payload: String, sage fn: String, command: String) -> CompileResult {
+        let example = "Try: \(command) k^2, k=1..n"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`\(command)` needs an expression.",
+                suggestion: example
+            ))
+        }
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count <= 1 else {
+            return .error(CompileError(
+                message: "`\(command)` takes one range `k=1..n` (got \(rangeClauses.count)).",
+                suggestion: example
+            ))
+        }
+        guard let clause = rangeClauses.first else {
+            return .error(CompileError(
+                message: "`\(command)` needs a range `k=1..n`.",
+                suggestion: example
+            ))
+        }
+        guard let r = parseRange(clause) else {
+            return .error(rangeError(clause, example: "k=1..n"))
+        }
+        let generated = "\(fn)(\(expr), \(r.variable), \(r.lower), \(r.upper))"
+        let req = orderedUnique([r.variable] + Variables.freeVariables(
+            in: "\(expr) \(r.lower) \(r.upper)", bound: [r.variable]))
+        return .success(generatedSage: generated, requiredVariables: req)
+    }
+
     // MARK: - Form: plot
 
     private static func plot(_ payload: String) -> CompileResult {
@@ -487,6 +676,106 @@ public enum FriendlyCompiler {
         return .success(generatedSage: sage, requiredVariables: req)
     }
 
+    // MARK: - Form: implicit_plot
+
+    /// `implicit_plot EQUATION, X=LO..HI, Y=LO..HI`
+    ///   → `implicit_plot(LHS == RHS, (x, xlo, xhi), (y, ylo, yhi))`
+    /// The equation translates a single top-level `=` to `==`; a bare expression
+    /// (no equals at all) normalizes to `EXPR == 0`. Exactly two ranges required;
+    /// the per-range errors mirror the double-integral branch.
+    private static func implicitPlot(_ payload: String) -> CompileResult {
+        let example = "Try: implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let rawEquation = parts.first?.trimmedShim, !rawEquation.isEmpty else {
+            return .error(CompileError(
+                message: "`implicit_plot` needs an equation.",
+                suggestion: example
+            ))
+        }
+        // Normalize the equation: `=` → `==`, `==` passes through, no equals →
+        // `EXPR == 0`.
+        let relation: String
+        if rawEquation.contains("==") {
+            relation = rawEquation
+        } else if let eq = splitEquation(rawEquation) {
+            relation = "\(eq.lhs) == \(eq.rhs)"
+        } else {
+            relation = "\(rawEquation) == 0"
+        }
+
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count == 2 else {
+            return .error(CompileError(
+                message: "`implicit_plot` needs two ranges (`x=...`, then `y=...`).",
+                suggestion: example
+            ))
+        }
+        guard let xRange = parseRange(rangeClauses[0]) else {
+            return .error(rangeError(rangeClauses[0], example: "x=-2..2"))
+        }
+        guard let yRange = parseRange(rangeClauses[1]) else {
+            return .error(rangeError(rangeClauses[1], example: "y=-2..2"))
+        }
+        let sage = "implicit_plot(\(relation), "
+            + "(\(xRange.variable), \(xRange.lower), \(xRange.upper)), "
+            + "(\(yRange.variable), \(yRange.lower), \(yRange.upper)))"
+        var req = Variables.freeVariables(
+            in: "\(relation) \(xRange.lower) \(xRange.upper) \(yRange.lower) \(yRange.upper)",
+            bound: [xRange.variable, yRange.variable]
+        )
+        req = orderedUnique([xRange.variable, yRange.variable] + req)
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
+    // MARK: - Form: parametric_plot
+
+    /// `parametric_plot (XEXPR, YEXPR), VAR=LO..HI`
+    ///   → `parametric_plot((XEXPR, YEXPR), (VAR, LO, HI))`
+    /// The parenthesized pair is one top-level unit; exactly one range required.
+    private static func parametricPlot(_ payload: String) -> CompileResult {
+        let example = "Try: parametric_plot (cos(t), sin(t)), t=0..2*pi"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let pairText = parts.first?.trimmedShim, !pairText.isEmpty else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        // Validate the parenthesized pair: outer parens, exactly two non-empty
+        // top-level pieces inside.
+        guard pairText.hasPrefix("("), pairText.hasSuffix(")") else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        let inner = String(pairText.dropFirst().dropLast())
+        let coords = Scanner.splitTopLevelCommas(inner).map { $0.trimmedShim }
+        guard coords.count == 2, coords.allSatisfy({ !$0.isEmpty }) else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs a coordinate pair `(x(t), y(t))`.",
+                suggestion: example
+            ))
+        }
+        let xExpr = coords[0]
+        let yExpr = coords[1]
+
+        let rangeClauses = Array(parts.dropFirst())
+        guard rangeClauses.count == 1 else {
+            return .error(CompileError(
+                message: "`parametric_plot` needs one range `var=a..b`.",
+                suggestion: example
+            ))
+        }
+        guard let r = parseRange(rangeClauses[0]) else {
+            return .error(rangeError(rangeClauses[0], example: "t=0..2*pi"))
+        }
+        let sage = "parametric_plot((\(xExpr), \(yExpr)), (\(r.variable), \(r.lower), \(r.upper)))"
+        let req = orderedUnique([r.variable] + Variables.freeVariables(
+            in: "\(xExpr) \(yExpr) \(r.lower) \(r.upper)", bound: [r.variable]))
+        return .success(generatedSage: sage, requiredVariables: req)
+    }
+
     // MARK: - Form: matrix / eigenvalues / rref
 
     private static func matrixForm(_ payload: String) -> CompileResult {
@@ -499,14 +788,441 @@ public enum FriendlyCompiler {
         return .success(generatedSage: "matrix(\(body))", requiredVariables: [])
     }
 
+    /// A matrix method like `det`/`eigenvalues`/`rref`. Two payload shapes:
+    ///
+    ///   * A bracketed literal (`[1,2; 3,4]` or `[[1,2],[3,4]]`) normalizes into
+    ///     Sage's row-list form and binds the method to a fresh `matrix(...)`:
+    ///     `matrix([[1,2],[3,4]]).det()`. (The frozen V0.7 contract.)
+    ///   * Anything else — a variable `A`, an expression `A*B`, or a tape ref
+    ///     already expanded to `__casette_tape_refs[3]` — is an existing matrix
+    ///     value: it binds directly, parenthesized, with its free variables
+    ///     reported: `(A).det()`. A `#ROW` reference reaches us already expanded
+    ///     to an identifier-shaped `__casette_tape_refs[N]` (starts with `_`,
+    ///     not `[`), so it takes this path naturally — no `#` special-case.
     private static func matrixMethod(_ payload: String, method: String) -> CompileResult {
-        guard let body = normalizeMatrixPayload(payload) else {
+        let body = payload.trimmedShim
+        if body.hasPrefix("[") {
+            guard let normalized = normalizeMatrixPayload(body) else {
+                return .error(CompileError(
+                    message: "`\(method)` needs a bracketed list of rows.",
+                    suggestion: "Try: \(method) [1,2; 3,4]"
+                ))
+            }
+            return .success(generatedSage: "matrix(\(normalized)).\(method)()", requiredVariables: [])
+        }
+        return .success(
+            generatedSage: "(\(body)).\(method)()",
+            requiredVariables: Variables.freeVariables(in: body))
+    }
+
+    private static func vectorForm(_ payload: String) -> CompileResult {
+        // A vector is a flat bracketed list (`[1,2,3]`) — it passes through
+        // verbatim inside the call (no row normalization; vectors aren't nested).
+        let body = payload.trimmedShim
+        guard body.hasPrefix("["), body.hasSuffix("]"), singleOuterBracketBody(body) != nil else {
             return .error(CompileError(
-                message: "`\(method)` needs a bracketed list of rows.",
-                suggestion: "Try: \(method) [1,2; 3,4]"
+                message: "`vector` needs a bracketed list of entries.",
+                suggestion: "Try: vector [1,2,3]"
             ))
         }
-        return .success(generatedSage: "matrix(\(body)).\(method)()", requiredVariables: [])
+        return .success(
+            generatedSage: "vector(\(body))",
+            requiredVariables: Variables.freeVariables(in: body))
+    }
+
+    // MARK: - Form: gradient
+
+    /// `gradient EXPR` → `(EXPR).gradient()`; `gradient EXPR, [x,y]` →
+    /// `(EXPR).gradient([x, y])`. A symbolic expression's `.gradient()`
+    /// differentiates over all free variables with no args; an explicit
+    /// bracketed var list orders and restricts that. The list entries are each
+    /// validated as plausible variables.
+    private static func gradient(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`gradient` needs an expression.",
+                suggestion: "Try: gradient x^2 + y^2  or  gradient x^2 + y^2, [x,y]"
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            // No var list: gradient over all free variables.
+            return .success(
+                generatedSage: "(\(expr)).gradient()",
+                requiredVariables: Variables.freeVariables(in: expr))
+        }
+        // A single bracketed var-list clause follows the expression.
+        let listText = rest.joined(separator: ", ").trimmedShim
+        guard let vars = bracketedVariableList(listText) else {
+            return .error(CompileError(
+                message: "`gradient` variables must be a bracketed list like `[x, y]`.",
+                suggestion: "Try: gradient x^2 + y^2, [x,y]"
+            ))
+        }
+        let req = orderedUnique(vars + Variables.freeVariables(in: expr, bound: vars))
+        return .success(
+            generatedSage: "(\(expr)).gradient([\(vars.joined(separator: ", "))])",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: hessian
+
+    /// `hessian EXPR` → `(EXPR).hessian()`. Sage's symbolic `.hessian()` takes
+    /// no reliable argument list, so ONLY the bare form is accepted; a second
+    /// clause is a structured error rather than an invented lowering.
+    private static func hessian(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`hessian` needs an expression.",
+                suggestion: "Try: hessian x^2 + y^2"
+            ))
+        }
+        guard parts.count == 1 else {
+            return .error(CompileError(
+                message: "`hessian` takes just an expression.",
+                suggestion: "Try: hessian x^2 + y^2"
+            ))
+        }
+        return .success(
+            generatedSage: "(\(expr)).hessian()",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: jacobian
+
+    /// `jacobian [F1, F2], [x, y]` → `jacobian([F1, F2], [x, y])` (Sage's
+    /// global `jacobian(functions, vars)`). Both clauses are required and
+    /// bracketed; the var-list entries are validated.
+    private static func jacobian(_ payload: String) -> CompileResult {
+        let example = "Try: jacobian [x^2+y, sin(x*y)], [x,y]"
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let functionsText = parts.first?.trimmedShim, !functionsText.isEmpty else {
+            return .error(CompileError(
+                message: "`jacobian` needs a bracketed list of functions.",
+                suggestion: example
+            ))
+        }
+        guard functionsText.hasPrefix("["), functionsText.hasSuffix("]"),
+              singleOuterBracketBody(functionsText) != nil else {
+            return .error(CompileError(
+                message: "`jacobian` functions must be a bracketed list like `[x^2+y, sin(x*y)]`.",
+                suggestion: example
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            return .error(CompileError(
+                message: "`jacobian` needs a bracketed variable list.",
+                suggestion: example
+            ))
+        }
+        let listText = rest.joined(separator: ", ").trimmedShim
+        guard let vars = bracketedVariableList(listText) else {
+            return .error(CompileError(
+                message: "`jacobian` variables must be a bracketed list like `[x, y]`.",
+                suggestion: example
+            ))
+        }
+        let req = orderedUnique(
+            vars + Variables.freeVariables(in: functionsText, bound: vars))
+        return .success(
+            generatedSage: "jacobian(\(functionsText), [\(vars.joined(separator: ", "))])",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: subs
+
+    /// `subs EXPR, V1=VAL1, V2=VAL2, ...` → `(EXPR).subs(V1=VAL1, V2=VAL2)`.
+    /// Each binding clause splits on its FIRST top-level `=`; the name must be
+    /// a plausible variable and the value non-empty (and not a range).
+    private static func subs(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`subs` needs an expression.",
+                suggestion: "Try: subs x^2 + y, x=3"
+            ))
+        }
+        let bindingClauses = Array(parts.dropFirst())
+        guard !bindingClauses.isEmpty else {
+            return .error(CompileError(
+                message: "`subs` needs at least one binding `var=value`.",
+                suggestion: "Try: subs x^2 + y, x=3"
+            ))
+        }
+        var bindings: [(name: String, value: String)] = []
+        for clause in bindingClauses {
+            let c = clause.trimmedShim
+            guard let eqIdx = c.firstIndex(of: "="), !c.contains("..") else {
+                return .error(CompileError(
+                    message: "`subs` binding `\(c)` must be `var=value`.",
+                    suggestion: "Try: subs x^2 + y, x=3"
+                ))
+            }
+            let name = String(c[c.startIndex..<eqIdx]).trimmedShim
+            let value = String(c[c.index(after: eqIdx)...]).trimmedShim
+            guard Variables.isPlausibleVariable(name), !value.isEmpty else {
+                return .error(CompileError(
+                    message: "`subs` binding `\(c)` must be `var=value`.",
+                    suggestion: "Try: subs x^2 + y, x=3"
+                ))
+            }
+            bindings.append((name, value))
+        }
+        let bindingSage = bindings.map { "\($0.name)=\($0.value)" }.joined(separator: ", ")
+        let bindingVars = bindings.map(\.name)
+        let bindingValues = bindings.map(\.value).joined(separator: " ")
+        let req = orderedUnique(
+            bindingVars + Variables.freeVariables(in: "\(expr) \(bindingValues)"))
+        return .success(
+            generatedSage: "(\(expr)).subs(\(bindingSage))",
+            requiredVariables: req)
+    }
+
+    // MARK: - Form: numeric
+
+    /// `numeric EXPR` → `N(EXPR)`; `numeric EXPR, DIGITS` →
+    /// `N(EXPR, digits=DIGITS)` (the last clause must be all digits).
+    private static func numeric(_ payload: String) -> CompileResult {
+        let parts = Scanner.splitTopLevelCommas(payload)
+        guard let expr = parts.first?.trimmedShim, !expr.isEmpty else {
+            return .error(CompileError(
+                message: "`numeric` needs an expression.",
+                suggestion: "Try: numeric pi  or  numeric pi, 50"
+            ))
+        }
+        let rest = Array(parts.dropFirst())
+        guard !rest.isEmpty else {
+            return .success(
+                generatedSage: "N(\(expr))",
+                requiredVariables: Variables.freeVariables(in: expr))
+        }
+        guard rest.count == 1 else {
+            return .error(CompileError(
+                message: "`numeric` takes at most a digit count after the expression.",
+                suggestion: "Try: numeric pi, 50"
+            ))
+        }
+        let digits = rest[0].trimmedShim
+        guard !digits.isEmpty, digits.allSatisfy({ $0.isNumber }) else {
+            return .error(CompileError(
+                message: "`numeric` digits must be a whole number (got `\(digits)`).",
+                suggestion: "Try: numeric pi, 50"
+            ))
+        }
+        return .success(
+            generatedSage: "N(\(expr), digits=\(digits))",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: latex
+
+    /// `latex EXPR` → `latex(EXPR)`.
+    private static func latexForm(_ payload: String) -> CompileResult {
+        let expr = payload.trimmedShim
+        return .success(
+            generatedSage: "latex(\(expr))",
+            requiredVariables: Variables.freeVariables(in: expr))
+    }
+
+    // MARK: - Form: var
+
+    /// `var x y z` (space-separated) or `var x, y, z` (commas) →
+    /// `var('x y z')`. Comma split is tried first; a single clause then splits
+    /// on whitespace. Every name must be a plausible identifier. `var()` itself
+    /// creates the names, so nothing is required as a prelude.
+    private static func varForm(_ payload: String) -> CompileResult {
+        let example = "`var` names must be identifiers. Try: var a b c"
+        let clauses = Scanner.splitTopLevelCommas(payload)
+            .map { $0.trimmedShim }
+            .filter { !$0.isEmpty }
+        let names: [String]
+        if clauses.count <= 1 {
+            names = (clauses.first ?? "")
+                .split(whereSeparator: { $0 == " " || $0 == "\t" })
+                .map(String.init)
+        } else {
+            names = clauses
+        }
+        guard !names.isEmpty, names.allSatisfy({ Variables.isPlausibleVariable($0) }) else {
+            return .error(CompileError(
+                message: example,
+                suggestion: "Try: var a b c"))
+        }
+        return .success(
+            generatedSage: "var('\(names.joined(separator: " "))')",
+            requiredVariables: [])
+    }
+
+    // MARK: - Form: assume
+
+    /// Two grammars:
+    ///   * `assume COND` where COND holds a top-level comparison operator
+    ///     (`<`, `>`, `<=`, `>=`, `==`, `!=`) → `assume(COND)` verbatim.
+    ///   * `assume VAR PROP` (optionally `assume VAR is PROP`) → `assume(VAR,
+    ///     'PROP')` for a known property, or `assume(VAR > 0)` / `assume(VAR <
+    ///     0)` for positive/negative.
+    /// A single bare `=` is rejected with a hint to use a comparison.
+    private static func assumeForm(_ payload: String) -> CompileResult {
+        let example = "Try: assume x > 0  or  assume x real"
+        let body = payload.trimmedShim
+
+        if topLevelComparisonOperator(in: body) != nil {
+            return .success(
+                generatedSage: "assume(\(body))",
+                requiredVariables: Variables.freeVariables(in: body))
+        }
+
+        // A bare `=` (assignment, not comparison) is a mistake here.
+        if splitEquation(body) != nil {
+            return .error(CompileError(
+                message: "`assume` needs a comparison like `x > 0`, not `=`.",
+                suggestion: example))
+        }
+
+        // Property grammar: `VAR PROP` or `VAR is PROP`.
+        var words = body.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        if words.count == 3, words[1].lowercased() == "is" {
+            words = [words[0], words[2]]
+        }
+        guard words.count == 2, Variables.isPlausibleVariable(words[0]) else {
+            return .error(CompileError(
+                message: "`assume` is malformed.",
+                suggestion: example))
+        }
+        let variable = words[0]
+        let property = words[1].lowercased()
+        let knownProperties: Set<String> = [
+            "real", "integer", "rational", "complex", "imaginary",
+            "even", "odd", "noninteger",
+        ]
+        let sage: String
+        switch property {
+        case "positive": sage = "assume(\(variable) > 0)"
+        case "negative": sage = "assume(\(variable) < 0)"
+        case _ where knownProperties.contains(property):
+            sage = "assume(\(variable), '\(property)')"
+        default:
+            return .error(CompileError(
+                message: "`assume` property `\(words[1])` is not recognized.",
+                suggestion: example))
+        }
+        return .success(generatedSage: sage, requiredVariables: [variable])
+    }
+
+    /// The first top-level comparison operator in `s` (depth 0 w.r.t. brackets),
+    /// not a bare `=` assignment. Returns the operator text, or nil.
+    private static func topLevelComparisonOperator(in s: String) -> String? {
+        let chars = Array(s)
+        var depth = 0
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            let next = i + 1 < chars.count ? chars[i + 1] : " "
+            switch ch {
+            case "(", "[", "{": depth += 1
+            case ")", "]", "}": depth -= 1
+            case "<" where depth == 0, ">" where depth == 0:
+                return next == "=" ? "\(ch)=" : "\(ch)"
+            case "=" where depth == 0 && next == "=": return "=="
+            case "!" where depth == 0 && next == "=": return "!="
+            default: break
+            }
+            i += 1
+        }
+        return nil
+    }
+
+    // MARK: - Form: forget
+
+    /// The no-argument `forget` (clears all assumptions). Bare, `all`, and
+    /// `assumptions` all lower to `forget()`; anything else is a structured
+    /// error.
+    private static func forgetForm(_ payload: String) -> CompileResult {
+        let body = payload.trimmedShim.lowercased()
+        guard body.isEmpty || body == "all" || body == "assumptions" else {
+            return .error(CompileError(
+                message: "`forget` clears all assumptions.",
+                suggestion: "Try: forget"))
+        }
+        return .success(generatedSage: "forget()", requiredVariables: [])
+    }
+
+    // MARK: - Form: choose
+
+    /// `choose N, K` → `binomial(N, K)` (exactly two clauses).
+    private static func chooseForm(_ payload: String) -> CompileResult {
+        let example = "Try: choose 10, 3"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }) else {
+            return .error(CompileError(
+                message: "`choose` needs two values `n, k`.",
+                suggestion: example))
+        }
+        return .success(
+            generatedSage: "binomial(\(parts[0]), \(parts[1]))",
+            requiredVariables: Variables.freeVariables(in: "\(parts[0]) \(parts[1])"))
+    }
+
+    // MARK: - Form: gcd / lcm
+
+    /// `gcd [12, 18, 24]` → `gcd([12, 18, 24])`; `gcd A, B` → `gcd(A, B)`;
+    /// `gcd A, B, C` → `gcd([A, B, C])`. A single non-bracketed clause errors.
+    private static func gcdLcmForm(_ payload: String, fn: String) -> CompileResult {
+        let example = "Try: \(fn) 12, 18  or  \(fn) [12, 18, 24]"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        let allVars = Variables.freeVariables(in: payload)
+        switch parts.count {
+        case 1:
+            let body = parts[0]
+            guard body.hasPrefix("[") else {
+                return .error(CompileError(
+                    message: "`\(fn)` needs two values or a bracketed list.",
+                    suggestion: example))
+            }
+            return .success(generatedSage: "\(fn)(\(body))", requiredVariables: allVars)
+        case 2:
+            return .success(
+                generatedSage: "\(fn)(\(parts[0]), \(parts[1]))",
+                requiredVariables: allVars)
+        default:
+            return .success(
+                generatedSage: "\(fn)([\(parts.joined(separator: ", "))])",
+                requiredVariables: allVars)
+        }
+    }
+
+    // MARK: - Form: mean
+
+    /// `mean DATA` → `sum(DATA)/len(DATA)` (Sage's global `mean()` is removed
+    /// upstream). DATA is one clause — a bracketed list or a variable — so the
+    /// result stays exact. Multi-clause payloads are an error.
+    private static func meanForm(_ payload: String) -> CompileResult {
+        let example = "Try: mean [1, 2, 3]"
+        let parts = Scanner.splitTopLevelCommas(payload).map { $0.trimmedShim }
+        guard parts.count == 1, let data = parts.first, !data.isEmpty else {
+            return .error(CompileError(
+                message: "`mean` takes one list of data.",
+                suggestion: example))
+        }
+        return .success(
+            generatedSage: "sum(\(data))/len(\(data))",
+            requiredVariables: Variables.freeVariables(in: data))
+    }
+
+    /// Parse a bracketed variable list `[x, y]`, validating each entry as a
+    /// plausible variable. Returns the trimmed names, or nil if the text isn't
+    /// a single bracketed list or any entry is not a valid variable.
+    private static func bracketedVariableList(_ text: String) -> [String]? {
+        let body = text.trimmedShim
+        guard body.hasPrefix("["), body.hasSuffix("]"),
+              let inside = singleOuterBracketBody(body) else { return nil }
+        let entries = Scanner.splitTopLevelCommas(inside).map { $0.trimmedShim }
+        guard !entries.isEmpty, entries.allSatisfy({ Variables.isPlausibleVariable($0) })
+        else { return nil }
+        return entries
     }
 
     private static func matlabMatrixShorthand(_ input: String) -> CompileResult? {
@@ -624,6 +1340,63 @@ public enum FriendlyCompiler {
         let upper = String(rangePart[dotRange.upperBound...]).trimmedShim
         guard !lower.isEmpty, !upper.isEmpty else { return nil }
         return Range(variable: v, lower: lower, upper: upper)
+    }
+
+    /// A tolerant view of a half-typed range clause, for the completion UI's
+    /// IRs. Where `parseRange` is STRICT (it returns nil unless a variable, `..`,
+    /// and BOTH bounds are present — correct for the compiler, which should error
+    /// on incomplete ranges), this preserves whatever the user has typed so the
+    /// formula bar never drops a field mid-edit. Empty bounds become nil.
+    struct PartialRange {
+        let variable: String
+        let lower: String?
+        let upper: String?
+    }
+
+    /// Parse a possibly-incomplete range clause without losing typed text:
+    ///   `v=lo..hi` → (v, lo, hi);  `v=lo..` → (v, lo, nil);  `v=..hi` → (v, nil, hi)
+    ///   `v=..` → (v, nil, nil);    `v=lo` → (v, lo, nil);    `v=` → (v, nil, nil)
+    ///   bare `lo..hi` (no `=`) → ("", lo, hi); `..hi` → ("", nil, hi); etc.
+    /// Returns nil only when the clause is not range-shaped at all (no `=` and no
+    /// `..`, e.g. a bare expression). The variable must be plausible OR empty.
+    static func parsePartialRange(_ clause: String) -> PartialRange? {
+        let c = clause.trimmedShim
+        let variable: String
+        let rangePart: String
+        if let eqIdx = c.firstIndex(of: "=") {
+            // Don't treat `==`/`<=`/`>=`/`!=` as an assignment `=`.
+            let after = c.index(after: eqIdx)
+            if after < c.endIndex, c[after] == "=" { return nil }
+            if eqIdx > c.startIndex {
+                let prev = c[c.index(before: eqIdx)]
+                if prev == "<" || prev == ">" || prev == "!" { return nil }
+            }
+            variable = String(c[c.startIndex..<eqIdx]).trimmedShim
+            rangePart = String(c[after...]).trimmedShim
+            guard variable.isEmpty || Variables.isPlausibleVariable(variable) else { return nil }
+        } else if c.contains("..") {
+            // Bare `lo..hi` form with no variable.
+            variable = ""
+            rangePart = c
+        } else {
+            // Neither `=` nor `..`: not range-shaped.
+            return nil
+        }
+
+        let lowerText: String
+        let upperText: String
+        if let dotRange = rangePart.range(of: "..") {
+            lowerText = String(rangePart[rangePart.startIndex..<dotRange.lowerBound]).trimmedShim
+            upperText = String(rangePart[dotRange.upperBound...]).trimmedShim
+        } else {
+            // `v=lo` with no `..` — the lone value is the lower bound.
+            lowerText = rangePart.trimmedShim
+            upperText = ""
+        }
+        return PartialRange(
+            variable: variable,
+            lower: lowerText.isEmpty ? nil : lowerText,
+            upper: upperText.isEmpty ? nil : upperText)
     }
 
     private static func rangeError(_ clause: String, example: String) -> CompileError {

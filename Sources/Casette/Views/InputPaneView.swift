@@ -45,8 +45,8 @@ struct InputPaneView: View {
                 KernelStatusView(state: model.kernelState, issue: model.kernelIssue)
                     .padding(.top, Theme.inputAccessoryTopPadding)
             }
-            if let formula = model.integralFormula {
-                IntegralFormulaBar(model: model, formula: formula)
+            if let formula = model.formulaIR {
+                FormulaBarView(model: model, formula: formula)
                     .padding(.leading, Theme.inputFormulaLeadingInset)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

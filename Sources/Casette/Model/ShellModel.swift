@@ -474,17 +474,107 @@ final class ShellModel {
         }
     }
 
-    /// The formula-bar IR for drafts that begin with the integral command.
-    /// It renders back to friendly input, so `#14` tape references and other
-    /// app-side source forms stay untouched until `CompiledInput.compile`.
-    var integralFormula: IntegralFormulaIR? {
-        IntegralFormulaIR.parse(draft)
+    /// The formula-bar IR for drafts that begin with a known friendly
+    /// command. It renders back to friendly input, so `#14` tape references
+    /// and other app-side source forms stay untouched until
+    /// `CompiledInput.compile`.
+    var formulaIR: FormulaIR? {
+        FormulaIR.parse(draft)
     }
 
-    func updateIntegralFormula(_ formula: IntegralFormulaIR) {
+    var integralFormula: IntegralFormulaIR? {
+        guard case let .integral(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var unaryFormula: UnaryFormulaIR? {
+        guard case let .unary(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var solveFormula: SolveFormulaIR? {
+        guard case let .solve(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var derivativeFormula: DerivativeFormulaIR? {
+        guard case let .derivative(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var limitFormula: LimitFormulaIR? {
+        guard case let .limit(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var taylorFormula: TaylorFormulaIR? {
+        guard case let .taylor(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var seriesRangeFormula: SeriesRangeFormulaIR? {
+        guard case let .seriesRange(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var plotFormula: PlotFormulaIR? {
+        guard case let .plot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var implicitPlotFormula: ImplicitPlotFormulaIR? {
+        guard case let .implicitPlot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var parametricPlotFormula: ParametricPlotFormulaIR? {
+        guard case let .parametricPlot(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var matrixFormula: MatrixFormulaIR? {
+        guard case let .matrixOp(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var vectorCalculusFormula: VectorCalculusFormulaIR? {
+        guard case let .vectorCalculus(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var subsFormula: SubsFormulaIR? {
+        guard case let .subs(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var numericFormula: NumericFormulaIR? {
+        guard case let .numeric(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var varFormula: VarFormulaIR? {
+        guard case let .varDeclaration(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var assumeFormula: AssumeFormulaIR? {
+        guard case let .assume(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    var binaryFormula: BinaryFormulaIR? {
+        guard case let .binary(ir) = formulaIR else { return nil }
+        return ir
+    }
+
+    func updateFormula(_ formula: FormulaIR) {
         let newDraft = formula.friendlyInput
         guard draft != newDraft else { return }
         draft = newDraft
+    }
+
+    func updateIntegralFormula(_ formula: IntegralFormulaIR) {
+        updateFormula(.integral(formula))
     }
 
     /// Return: compile and evaluate, advancing (the draft clears).

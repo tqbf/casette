@@ -309,6 +309,164 @@ struct ShellModelInputTests {
         #expect(model.integralFormula?.upperBound == "1")
     }
 
+    @Test("unary formula bar model rewrites friendly IR")
+    func unaryFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "factor x^2 - 1"
+        guard case let .unary(formula0) = model.formulaIR, formula0.keyword == .factor else {
+            Issue.record("expected unary(factor) formula")
+            return
+        }
+        #expect(formula0.expression == "x^2 - 1")
+        #expect(model.draftPreview == .generated("factor(x^2 - 1)"))
+
+        var formula = formula0
+        formula.expression = "x^4 - 1"
+        model.updateFormula(.unary(formula))
+        #expect(model.draft == "factor x^4 - 1")
+        #expect(model.unaryFormula?.expression == "x^4 - 1")
+        #expect(model.draftPreview == .generated("factor(x^4 - 1)"))
+    }
+
+    @Test("solve formula bar model rewrites friendly IR with a for-var edit")
+    func solveFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "solve x*y = 1"
+        guard case let .solve(formula0) = model.formulaIR else {
+            Issue.record("expected solve formula")
+            return
+        }
+        #expect(formula0.equation == "x*y = 1")
+        #expect(formula0.hasExplicitVariable == false)
+
+        var formula = formula0
+        formula.variable = "x"
+        formula.hasExplicitVariable = true
+        model.updateFormula(.solve(formula))
+        #expect(model.draft == "solve x*y = 1 for x")
+        #expect(model.solveFormula?.variable == "x")
+        #expect(model.draftPreview == .generated("solve(x*y == 1, x)"))
+    }
+
+    @Test("sum formula bar model rewrites friendly IR with filled bounds")
+    func sumFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "sum k^2"
+        guard case let .seriesRange(formula0) = model.formulaIR, formula0.kind == .sum else {
+            Issue.record("expected seriesRange(sum) formula")
+            return
+        }
+        #expect(formula0.expression == "k^2")
+        #expect(formula0.indexVariable.isEmpty)
+
+        var formula = formula0
+        formula.indexVariable = "k"
+        formula.lowerBound = "1"
+        formula.upperBound = "n"
+        model.updateFormula(.seriesRange(formula))
+        #expect(model.draft == "sum k^2, k=1..n")
+        #expect(model.seriesRangeFormula?.lowerBound == "1")
+        #expect(model.seriesRangeFormula?.upperBound == "n")
+        #expect(model.draftPreview == .generated("sum(k^2, k, 1, n)"))
+    }
+
+    @Test("limit formula bar model rewrites a direction edit")
+    func limitFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "limit sin(x)/x, x->0"
+        guard case let .limit(formula0) = model.formulaIR else {
+            Issue.record("expected limit formula")
+            return
+        }
+        #expect(formula0.direction == .both)
+
+        var formula = formula0
+        formula.direction = .right
+        model.updateFormula(.limit(formula))
+        #expect(model.draft == "limit sin(x)/x, x->0, right")
+        #expect(model.limitFormula?.direction == .right)
+        #expect(model.draftPreview == .generated("limit(sin(x)/x, x=0, dir='+')"))
+    }
+
+    @Test("plot formula bar model rewrites friendly IR with filled bounds")
+    func plotFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "plot sin(x)"
+        guard var formula = model.plotFormula else {
+            Issue.record("expected plot formula")
+            return
+        }
+        #expect(formula.expression == "sin(x)")
+        #expect(formula.variable == "x")  // inferred single free var
+
+        formula.lowerBound = "-pi"
+        formula.upperBound = "pi"
+        model.updateFormula(.plot(formula))
+        #expect(model.draft == "plot sin(x), x=-pi..pi")
+        #expect(model.plotFormula?.lowerBound == "-pi")
+        #expect(model.plotFormula?.upperBound == "pi")
+        #expect(model.draftPreview == .generated("plot(sin(x), (x, -pi, pi))"))
+    }
+
+    @Test("implicit-plot formula bar model rewrites friendly IR with filled ranges")
+    func implicitPlotFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "implicit_plot x^2 + y^2 = 1"
+        guard var formula = model.implicitPlotFormula else {
+            Issue.record("expected implicit-plot formula")
+            return
+        }
+        #expect(formula.equation == "x^2 + y^2 = 1")
+
+        formula.xLower = "-2"
+        formula.xUpper = "2"
+        formula.yLower = "-2"
+        formula.yUpper = "2"
+        model.updateFormula(.implicitPlot(formula))
+        #expect(model.draft == "implicit_plot x^2 + y^2 = 1, x=-2..2, y=-2..2")
+        #expect(model.implicitPlotFormula?.xUpper == "2")
+        #expect(model.implicitPlotFormula?.yLower == "-2")
+        #expect(model.draftPreview == .generated(
+            "implicit_plot(x^2 + y^2 == 1, (x, -2, 2), (y, -2, 2))"))
+    }
+
+    @Test("matrix formula bar model rewrites friendly IR with a filled payload")
+    func matrixFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "det"
+        guard case let .matrixOp(formula0) = model.formulaIR, formula0.kind == .det else {
+            Issue.record("expected matrixOp(det) formula")
+            return
+        }
+        #expect(formula0.payload.isEmpty)
+
+        var formula = formula0
+        formula.payload = "[1,2; 3,4]"
+        model.updateFormula(.matrixOp(formula))
+        #expect(model.draft == "det [1,2; 3,4]")
+        #expect(model.matrixFormula?.payload == "[1,2; 3,4]")
+        #expect(model.draftPreview == .generated("matrix([[1,2],[3,4]]).det()"))
+    }
+
+    @Test("matrix formula bar resolves a tape reference at the compile boundary")
+    func matrixFormulaTapeReferenceCompiles() {
+        let rows = [
+            SessionRow(
+                input: "matrix([[1,2],[3,4]])", sage: "matrix([[1,2],[3,4]])",
+                result: PersistedEnvelope(kind: "matrix", plain: "[1 2]\n[3 4]"),
+                status: .ok, timestamp: .now
+            ),
+        ]
+        let model = ShellModel(rows: rows)
+        #expect(model.tapeReferences.entries.keys.sorted() == [1])
+
+        model.draft = "det #1"
+        #expect(model.matrixFormula?.payload == "#1")
+        // CompiledInput expands `#1` to the identifier-shaped tape ref, which the
+        // generalized matrix-method path treats as a value (not a literal).
+        #expect(model.draftPreview == .generated("(__casette_tape_refs[1]).det()"))
+    }
+
     @Test("tape references use visible row numbers but only successful reusable rows are valid")
     func tapeReferencesSkipErrorsButKeepVisibleNumbers() {
         let rows = [
@@ -356,6 +514,96 @@ struct ShellModelInputTests {
         }
         let model = ShellModel(rows: rows)
         #expect(model.tapeReferences.entries.keys.sorted() == Array(6...25))
+    }
+
+    @Test("subs formula bar model rewrites friendly IR with a bindings edit")
+    func subsFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "subs x^2 + y"
+        guard case let .subs(formula0) = model.formulaIR else {
+            Issue.record("expected subs formula")
+            return
+        }
+        #expect(formula0.expression == "x^2 + y")
+        #expect(formula0.bindings.isEmpty)
+
+        var formula = formula0
+        formula.bindings = "x=3"
+        model.updateFormula(.subs(formula))
+        #expect(model.draft == "subs x^2 + y, x=3")
+        #expect(model.subsFormula?.bindings == "x=3")
+        #expect(model.draftPreview == .generated("(x^2 + y).subs(x=3)"))
+    }
+
+    @Test("numeric formula bar model rewrites friendly IR with a digits edit")
+    func numericFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "numeric pi"
+        guard case let .numeric(formula0) = model.formulaIR else {
+            Issue.record("expected numeric formula")
+            return
+        }
+        #expect(formula0.expression == "pi")
+        #expect(formula0.digits.isEmpty)
+
+        var formula = formula0
+        formula.digits = "50"
+        model.updateFormula(.numeric(formula))
+        #expect(model.draft == "numeric pi, 50")
+        #expect(model.numericFormula?.digits == "50")
+        #expect(model.draftPreview == .generated("N(pi, digits=50)"))
+    }
+
+    @Test("choose formula bar model rewrites friendly IR with filled values")
+    func chooseFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "choose"
+        guard case let .binary(formula0) = model.formulaIR, formula0.kind == .choose else {
+            Issue.record("expected binary(choose) formula")
+            return
+        }
+        #expect(formula0.first.isEmpty)
+        #expect(formula0.second.isEmpty)
+
+        var formula = formula0
+        formula.first = "10"
+        formula.second = "3"
+        model.updateFormula(.binary(formula))
+        #expect(model.draft == "choose 10, 3")
+        #expect(model.binaryFormula?.first == "10")
+        #expect(model.binaryFormula?.second == "3")
+        #expect(model.draftPreview == .generated("binomial(10, 3)"))
+    }
+
+    @Test("assume formula bar model rewrites a condition edit")
+    func assumeFormulaModelRewrite() {
+        let model = ShellModel()
+        model.draft = "assume x > 0"
+        guard case let .assume(formula0) = model.formulaIR else {
+            Issue.record("expected assume formula")
+            return
+        }
+        #expect(formula0.condition == "x > 0")
+        #expect(model.draftPreview == .generated("assume(x > 0)"))
+    }
+
+    // MARK: - Tab-into-lane guard (Defect 2)
+
+    @Test("Tab enters the formula lane only when a lane is showing and no picker is up")
+    func tabEntersLaneGuard() {
+        // No formula → no lane to enter (Tab keeps its default text behavior).
+        #expect(InputEditor.shouldEnterLane(formulaIR: nil, pendingAmbiguity: nil) == false)
+
+        let model = ShellModel()
+        model.draft = "integral x^2"
+        let formula = model.formulaIR
+        #expect(formula != nil)
+        // A lane is showing and no picker → Tab should enter the lane.
+        #expect(InputEditor.shouldEnterLane(formulaIR: formula, pendingAmbiguity: nil) == true)
+
+        // A pending ambiguity picker owns the keyboard; Tab must NOT steal focus.
+        let picker = PendingAmbiguity(raw: "solve x*y = 1", candidates: ["a", "b"], advances: true)
+        #expect(InputEditor.shouldEnterLane(formulaIR: formula, pendingAmbiguity: picker) == false)
     }
 
     @Test("multiline drafts preview as raw Sage")
