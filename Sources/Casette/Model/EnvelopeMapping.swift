@@ -30,6 +30,9 @@ extension PersistedEnvelope {
     let truncated = response["truncated"] as? Bool ?? false
     let stdout = response["stdout"] as? String
     let stderr = response["stderr"] as? String
+    let matrixProperties = (response["matrix_properties"] as? [[String: Any]])?.map {
+      MatrixProperty(workerProperty: $0)
+    }
 
     // The V0.3 truncation object ({plain_len, repr_len, plain_cap, repr_cap}),
     // present only when `truncated` — the "showing N of M chars" sizes (V1.5).
@@ -68,9 +71,21 @@ extension PersistedEnvelope {
       artifacts: artifacts,
       truncated: truncated,
       truncation: truncation,
+      matrixProperties: matrixProperties,
       stdout: (stdout?.isEmpty == true) ? nil : stdout,
       stderr: (stderr?.isEmpty == true) ? nil : stderr,
       error: error)
+  }
+}
+
+extension MatrixProperty {
+  /// Builds one matrix Inspector fact from the worker's Sage `is_*()` payload.
+  init(workerProperty entry: [String: Any]) {
+    self.init(
+      name: entry["name"] as? String ?? "is_unknown",
+      label: entry["label"] as? String ?? "Unknown",
+      value: entry["value"] as? Bool,
+      error: entry["error"] as? String)
   }
 }
 

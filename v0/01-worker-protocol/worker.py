@@ -424,6 +424,77 @@ def __casette_matrix_table_json_close(handle):
     return True
 
 
+def _matrix_properties(value):
+    """Return every no-argument Sage matrix is_* property we can inspect.
+
+    Sage exposes matrix facts as a large family of `is_*()` methods. The app
+    renders this structured list in the Inspector instead of asking Swift to
+    know Sage's method vocabulary. Methods that need arguments or fail on the
+    current ring are kept as unavailable rows so the user can see the boundary
+    rather than wonder whether the property was omitted.
+    """
+    if "sage.matrix" not in (type(value).__module__ or ""):
+        return None
+
+    entries = []
+    seen = set()
+    for name in sorted(dir(value)):
+        if not name.startswith("is_") or name.startswith("is__"):
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+
+        try:
+            attr = getattr(value, name)
+        except Exception as exc:  # noqa: BLE001 - report unavailable metadata
+            entries.append(_matrix_property_error(name, exc))
+            continue
+
+        if not callable(attr):
+            continue
+
+        try:
+            answer = attr()
+        except Exception as exc:  # noqa: BLE001 - TypeError, NotImplemented, ring errors
+            entries.append(_matrix_property_error(name, exc))
+            continue
+
+        if isinstance(answer, bool):
+            entries.append({
+                "name": name,
+                "label": _matrix_property_label(name),
+                "value": answer,
+            })
+
+    return entries
+
+
+def _matrix_property_error(name, exc):
+    return {
+        "name": name,
+        "label": _matrix_property_label(name),
+        "error": "%s: %s" % (type(exc).__name__, exc),
+    }
+
+
+def _matrix_property_label(name):
+    words = name[3:].split("_")
+    replacements = {
+        "lll": "LLL",
+        "rdf": "RDF",
+        "cdf": "CDF",
+        "rref": "RREF",
+        "echelonized": "Echelonized",
+        "hessenberg": "Hessenberg",
+        "ldlt": "LDLT",
+    }
+    titled = []
+    for word in words:
+        titled.append(replacements.get(word.lower(), word.title()))
+    return " ".join(titled)
+
+
 def _install_casette_preloads(ns):
     names = [
         "normal_pdf", "normal_cdf", "normal_between", "normal_inv",
@@ -1211,6 +1282,9 @@ def _build_envelope(value, artifacts=None, digits=None, numeric=False):
         "artifacts": list(artifacts) if artifacts else [],
         "truncated": truncated,
     }
+    matrix_properties = _matrix_properties(value)
+    if matrix_properties is not None:
+        env["matrix_properties"] = matrix_properties
     if exact_value is not None:
         env["exact_value"] = exact_value
     if truncated:

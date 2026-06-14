@@ -135,6 +135,7 @@ struct TapeRowView: View {
         // Selection is a tap gesture (a Button would fight text selection and
         // hover styling), so surface it to assistive tech explicitly.
         .accessibilityAddTraits(.isButton)
+        .simultaneousGesture(TapGesture().onEnded { onSelect() })
         .onHover { isHovered = $0 }
         .contextMenu {
             Button("Copy Input") { Pasteboard.copy(row.input) }

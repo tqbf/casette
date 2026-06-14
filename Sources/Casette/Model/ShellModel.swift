@@ -657,6 +657,7 @@ final class ShellModel {
         _ compiled: CompiledInput, advancing: Bool, numeric: Bool = false
     ) -> SessionRow.ID {
         let rowID = append(compiled, numeric: numeric)
+        select(rowID)
         inputHistory.record(compiled.raw)
         if advancing {
             draft = ""

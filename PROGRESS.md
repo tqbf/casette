@@ -4,10 +4,21 @@
 
 Casette is a native macOS SageMath-backed calculator with a persistent session tape. The project has completed the V0 proof sequence and V1.1 through V1.10 in the app: the SwiftPM app bundle builds locally, talks to a real Sage worker, renders math and plots, supports friendly input, exact/numeric controls, sidebar workflows, persistence/restore/replay/crash recovery, and now an in-app Sage Doctor for discovery and diagnostics.
 
-Current gates are green: `swift test` (**640/640**, 97 suites), `make check`,
-`make build`, and the worker envelope harness (**108/108**) passed for the
-latest statistics/preload work. Detailed historical notes live in [`progress/`](progress/),
+Current gates are green: `swift test` (**642/642**, 97 suites), `make check`,
+`make build`, and the worker envelope harness (**110/110**) passed for the
+latest matrix-inspector work. Detailed historical notes live in [`progress/`](progress/),
 newest first. Hard-won bug lessons live in [`PROBLEMS.md`](PROBLEMS.md).
+
+**Latest matrix-inspector work:** Matrix result envelopes now carry additive
+`matrix_properties` metadata from Sage's no-argument `is_*()` methods. Swift
+maps that to persisted `matrixProperties`, and the Inspector's (i) tab renders
+a compact **Matrix Properties** section: true facts are visible immediately,
+while false and unavailable facts sit in disclosure groups so the sidebar stays
+scan-friendly but still exposes the full Sage property set. The worker protocol
+and session-format docs record the new field; focused Swift tests and the V0.3
+worker envelope harness pin the mapping. Live Computer Use verification on
+`build/Casette.app` confirmed that evaluating `matrix([[1,2],[3,4]])` selects
+the fresh row and shows the properties section at the top of the Inspector tab.
 
 **Latest matrix-table work:** Abbreviated matrix rows now offer a subtle
 `tablecells` pop-out button next to Copy. The affordance appears exactly when

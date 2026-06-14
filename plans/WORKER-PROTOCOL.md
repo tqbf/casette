@@ -86,6 +86,10 @@ explicitly.
   "primary_is_approx": false,    // put "≈" on the primary value? (V0.8)
   "actions": ["det","rank","rref","eigenvalues","transpose","inverse",
               "column_space","row_space","right_kernel","change_ring_RDF"],
+  "matrix_properties": [         // matrix-only Sage is_*() facts
+    {"name":"is_square","label":"Square","value":true},
+    {"name":"is_zero","label":"Zero","value":false}
+  ],
   "artifacts": [],               // V0.5 fills this (plot files etc.)
   "truncated": false,            // was plain/repr capped?
   "stdout": "",                  // user prints / raw fd writes, captured
@@ -150,6 +154,7 @@ explicitly.
 | `primary_is_approx` | bool | value/error/interrupted | Should the UI render `≈` on the **primary** value (the primary already is a float, or force-numeric) vs on the secondary line? (V0.8) |
 | `exact_value` | string | only `numeric:true` evals | The original exact form, preserved while `plain` shows the numeric primary. (V0.8) |
 | `actions` | string[] | value/error/interrupted | Result-kind-aware op names the UI can offer. May be empty (e.g. `boolean`). |
+| `matrix_properties` | object[] | matrix values | Additive matrix-only list of Sage `is_*()` facts: `{name, label, value}` for boolean results, or `{name, label, error}` when the method needs arguments or cannot decide. |
 | `artifacts` | array | always | `[]` for non-plot results; for plots, one or more `{type,format,path,bytes}` image entries (V0.5; see "Artifacts" below). |
 | `truncated` | bool | value/none | Was `plain`/`repr` capped? |
 | `truncation` | object | only when `truncated` | `{plain_len, repr_len, plain_cap, repr_cap}` — original sizes + caps, so the UI can say "N of M chars". |

@@ -204,6 +204,14 @@ def main():
           "change_ring_RDF" in r.get("actions", [])
           and "svd" not in r.get("actions", []),
           f"actions={r.get('actions')!r}")
+    props = r.get("matrix_properties", [])
+    prop_values = {p.get("name"): p.get("value") for p in props}
+    check("matrix envelope carries Sage is_* property metadata",
+          isinstance(props, list)
+          and prop_values.get("is_square") is True
+          and prop_values.get("is_zero") is False
+          and all("label" in p for p in props),
+          f"matrix_properties={props!r}")
     r = w.eval("matrix(RDF, [[1,2],[3,4]])")
     check("RDF matrix offers SVD",
           "svd" in r.get("actions", []),

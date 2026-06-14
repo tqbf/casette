@@ -106,7 +106,14 @@ enum PlaceholderData {
                     // normalizer rewrites to pmatrix (PROBLEMS.md V0.4).
                     latex: "\\left(\\begin{array}{rr}\n2 & 1 \\\\\n1 & 2\n\\end{array}\\right)",
                     repr: "[2 1]\n[1 2]",
-                    actions: matrixActions
+                    actions: matrixActions,
+                    matrixProperties: [
+                        MatrixProperty(name: "is_square", label: "Square", value: true),
+                        MatrixProperty(name: "is_symmetric", label: "Symmetric", value: true),
+                        MatrixProperty(name: "is_invertible", label: "Invertible", value: true),
+                        MatrixProperty(name: "is_zero", label: "Zero", value: false),
+                        MatrixProperty(name: "is_diagonal", label: "Diagonal", value: false),
+                    ]
                 ),
                 at: at(6.5), duration: 0.0012
             ),
