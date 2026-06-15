@@ -20,6 +20,15 @@ worker envelope harness pin the mapping. Live Computer Use verification on
 `build/Casette.app` confirmed that evaluating `matrix([[1,2],[3,4]])` selects
 the fresh row and shows the properties section at the top of the Inspector tab.
 
+**Latest SwiftMath launch-crash hardening:** A user crash report from
+2026-06-13 showed `Bundle.module` trapping while `MTMathUILabel` initialized
+its default Latin Modern font. The build now copies SwiftMath's generated
+`SwiftMath_SwiftMath.bundle` into `Contents/Resources`, verifies the generated
+SwiftMath accessor was patched to search that location, and fails the build if
+`latinmodern-math.otf` is missing from the copied bundle. This keeps
+copied/distributed app bundles from depending on the developer `.build`
+resource fallback.
+
 **Latest matrix-table work:** Abbreviated matrix rows now offer a subtle
 `tablecells` pop-out button next to Copy. The affordance appears exactly when
 the matrix card's LaTeX preview uses `\cdots`/`\vdots`; opening it asks Sage for
