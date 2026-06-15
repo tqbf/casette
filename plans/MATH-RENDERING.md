@@ -193,8 +193,11 @@ V0.4 record:
    than mono text at equal point size.
 6. **Bundling:** `build.sh` copies every SwiftPM resource bundle from the build
    products dir into `Contents/Resources` (today that's
-   `SwiftMath_SwiftMath.bundle/mathFonts.bundle`) — without it math renders
-   nothing at runtime (the V0.4 `bundle.sh` lesson, now in the real build).
+   `SwiftMath_SwiftMath.bundle/mathFonts.bundle`) and verifies the generated
+   SwiftMath `Bundle.module` accessor was patched to search that location.
+   Without these fonts, SwiftMath traps in `Bundle.module` the first time an
+   `MTMathUILabel` initializes after the app is copied away from the developer
+   `.build` fallback (the V0.4 `bundle.sh` lesson, now in the real build).
 7. **Accessibility:** the typeset math NSView is silent to VoiceOver, so the
    hero wraps it in `.accessibilityElement(children: .ignore)` +
    `.accessibilityLabel(plain)` — the envelope's `plain` text is the spoken
